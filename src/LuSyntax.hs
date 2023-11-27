@@ -270,6 +270,7 @@ instance PP Statement where
   pp (Repeat b e) =
     PP.hang (PP.text "repeat") 2 (pp b)
       PP.$+$ PP.text "until" <+> pp e
+  pp (FunctionDef p r) = undefined
 
 level :: Bop -> Int
 level Times = 7
@@ -414,6 +415,7 @@ instance Arbitrary Statement where
     first b
       ++ [Repeat b' e | b' <- shrink b]
       ++ [Repeat b e' | e' <- shrink e]
+  shrink (FunctionDef r p) = undefined
 
 -- | access the first statement in a block, if one exists
 first :: Block -> [Statement]
