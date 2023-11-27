@@ -216,7 +216,7 @@ evalS (Assign v e) = do
     Just ref -> update ref e'
     _ -> return ()
 evalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-evalS (FunctionDef p r) = undefined
+evalS (FunctionDef p r b) = undefined
 evalS Empty = return () -- do nothing
 
 exec :: Block -> Store -> Store

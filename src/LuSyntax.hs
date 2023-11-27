@@ -26,7 +26,7 @@ data Statement
   | While Expression Block -- while e do s end
   | Empty -- ';'
   | Repeat Block Expression -- repeat s until e
-  | FunctionDef TypedValue TypedValue  -- function foo(v1: t1): t2
+  | FunctionDef TypedValue TypedValue Block  -- function foo(v1: t1): t2
   deriving (Eq, Show)
 
 data Expression
@@ -270,7 +270,7 @@ instance PP Statement where
   pp (Repeat b e) =
     PP.hang (PP.text "repeat") 2 (pp b)
       PP.$+$ PP.text "until" <+> pp e
-  pp (FunctionDef p r) = undefined
+  pp (FunctionDef p r b) = undefined
 
 level :: Bop -> Int
 level Times = 7
@@ -415,7 +415,7 @@ instance Arbitrary Statement where
     first b
       ++ [Repeat b' e | b' <- shrink b]
       ++ [Repeat b e' | e' <- shrink e]
-  shrink (FunctionDef r p) = undefined
+  shrink (FunctionDef r p b) = undefined
 
 -- | access the first statement in a block, if one exists
 first :: Block -> [Statement]
