@@ -3,6 +3,7 @@ module LuSyntax where
 import Control.Monad (mapM_)
 import qualified Data.Char as Char
 import Data.Map (Map)
+import LuTypes
 import qualified Data.Map as Map
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
@@ -25,6 +26,7 @@ data Statement
   | While Expression Block -- while e do s end
   | Empty -- ';'
   | Repeat Block Expression -- repeat s until e
+  | FunctionDef TypedValue TypedValue  -- function foo(v1: t1): t2
   deriving (Eq, Show)
 
 data Expression
@@ -43,6 +45,8 @@ data Value
   | TableVal Name -- <not used in source programs>
   deriving (Eq, Show, Ord)
 
+type TypedValue = (Value, LType) 
+  
 data Uop
   = Neg -- `-` :: Int -> Int
   | Not -- `not` :: a -> Bool
