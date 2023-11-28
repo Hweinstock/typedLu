@@ -189,7 +189,7 @@ test_exp =
         P.parse tableConstP "{ x = 2, [3] = false }"
           ~?= Right (TableConst [FieldName "x" (Val (IntVal 2)), FieldKey (Val (IntVal 3)) (Val (BoolVal False))])
       ]
-
+-- NEW TESTS
 test_stat :: Test
 test_stat =
   "parsing statements" ~:
@@ -202,7 +202,9 @@ test_stat =
           ~?= Right (While (Val NilVal) (Block [])),
         P.parse statementP "repeat ; ; until false"
           ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False))), 
-        P.parse statementP "function foo(x: int): int return x + 5 end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))]))))
+        P.parse statementP "function foo(x: int): int return x + 5 end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))), 
+        P.parse statementP "function foo(): nil ; end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [] NilType (Block [Empty])))), 
+        P.parse statementP "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "Here"))]))))
       ]
 
 test :: IO Counts
