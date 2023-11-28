@@ -36,7 +36,7 @@ data Expression
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
   | TableConst [TableField] -- table construction, { x = 3 , y = 5 }
-  | Call Name [Expression] -- foo(x, y)
+  | Call Var [Expression] -- foo(x, y)
   deriving (Eq, Show)
 
 data Value

@@ -81,7 +81,6 @@ test_bopP =
         P.parse (many bopP) ">=.. <= ..>..<" ~?= Right [Ge, Concat, Le, Concat, Gt, Concat, Lt]
       ]
 
--- TODO
 test_functionP :: Test 
 test_functionP = 
   "Parsing functionP" ~: 
@@ -91,33 +90,39 @@ test_functionP =
       P.parse functionP "function (): string return \"hello world\" end" ~?= Right (FunctionVal [] StringType (Block [Return (Val (StringVal "hello world"))]))
      ] 
 
--- TODO
 test_callP :: Test 
 test_callP = 
   "Parsing callP" ~: 
     TestList 
-      [] 
+      [P.parse callP "foo()" ~?= Right (Call (Name "foo") []), 
+       P.parse callP "foo(x, y)" ~?= Right (Call (Name "foo") [Var (Name "x"), Var (Name "y")]), 
+       P.parse callP "foo(1+1)" ~?= Right (Call (Name "foo") [Op2 (Val (IntVal 1)) Plus (Val (IntVal 1))])] 
 
--- TODO
 test_parameterP :: Test
 test_parameterP = 
   "Parsing parameterP" ~:
     TestList 
-      [] 
+      [P.parse parameterP "x: int" ~?= Right ("x", IntType), 
+       P.parse parameterP "y: string" ~?= Right ("y", StringType), 
+       P.parse parameterP "z: boolean" ~?= Right ("z", BooleanType)] 
 
--- TODO
 test_parametersP :: Test
 test_parametersP = 
   "Parsing parametersP" ~: 
     TestList 
-      [] 
+      [P.parse parametersP "(x: int, y: int, z: int)" ~?= Right [("x", IntType), ("y", IntType), ("z", IntType)], 
+       P.parse parametersP "(x: int, y: string, z: boolean)" ~?= Right [("x", IntType), ("y", StringType), ("z", BooleanType)],
+       P.parse parametersP "()" ~?= Right []
+      ] 
 
--- TODO
 test_lTypeP :: Test 
 test_lTypeP = 
   "Parsing lTypeP" ~:
     TestList 
-      [] 
+      [P.parse lTypeP "int" ~?= Right IntType, 
+       P.parse lTypeP "nil" ~?= Right NilType, 
+       P.parse lTypeP "string" ~?= Right StringType, 
+       P.parse lTypeP "boolean" ~?= Right BooleanType] 
 
 test_tableConstP :: Test
 test_tableConstP =
