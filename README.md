@@ -1,4 +1,4 @@
-# project-cis5520
+ project-cis5520
 
 This is an "Empty project" for Haskell. It is configured in the same way as
 the lecture demo and homework assignments for CIS 5520, but contains no
@@ -45,7 +45,7 @@ CP1:
 - [ ] quickCheck tests for `synthesis`.
 - [ ] Unit tests for `checker`.
 - [ ] quickCheck tests for `checker`.
-- [ ] Outline function implementation in parser w/ unit tests.
+- [x] Outline function implementation in parser w/ unit tests.
 - [ ] Outline function implementation in evaluator w/ unit tests.
 
 CP2:
