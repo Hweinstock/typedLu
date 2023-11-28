@@ -1,4 +1,4 @@
- project-cis5520
+# project-cis5520
 
 This is an "Empty project" for Haskell. It is configured in the same way as
 the lecture demo and homework assignments for CIS 5520, but contains no
