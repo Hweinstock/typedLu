@@ -9,7 +9,7 @@ foo = function (z: boolean) : string
 end 
 
 s = foo(true)
-if s == "True" then 
+if s == "False" then 
     z = x + y 
 else 
     z = x - y 

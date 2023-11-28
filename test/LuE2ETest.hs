@@ -53,3 +53,12 @@ test_if =
           ]
 
 
+test_function :: Test 
+test_function = 
+    "e2e function" ~: 
+        TestList 
+           [
+             "function1" ~: testFile "test/lu/function1.lu" (\s -> Right True), -- basically just check it parses the function. 
+             "function2" ~: testFile "test/lu/function2.lu" (checkVarValue "z" (IntVal 11)), 
+             "function3" ~: testFile "test/lu/function3.lu" (checkVarValue "z" (IntVal (-1))) 
+           ]
