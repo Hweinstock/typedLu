@@ -80,7 +80,7 @@ test_bopP =
         P.parse (many bopP) "> >= $ <=" ~?= Right [Gt, Ge],
         P.parse (many bopP) ">=.. <= ..>..<" ~?= Right [Ge, Concat, Le, Concat, Gt, Concat, Lt]
       ]
-
+-- START NEW TESTS
 test_functionP :: Test 
 test_functionP = 
   "Parsing functionP" ~: 
@@ -123,7 +123,7 @@ test_lTypeP =
        P.parse lTypeP "nil" ~?= Right NilType, 
        P.parse lTypeP "string" ~?= Right StringType, 
        P.parse lTypeP "boolean" ~?= Right BooleanType] 
-
+-- END NEW TESTS
 test_tableConstP :: Test
 test_tableConstP =
   "Parsing tableConst" ~:
