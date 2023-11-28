@@ -50,7 +50,8 @@ CP1:
 
 CP2:
 - [ ] Implement arbitrary and shrink for `LType`.
-- [ ] Modify parser to parse functions.
+- [ ] Modify parser to parse functions with basic types (nil, int, string, boolean). 
+- [ ] Add more advanced types to the parser (table, functions)
 - [ ] Modify evaluator to evaluate functions.
 - [ ] Implement `checker`. 
 - [ ] Implement `synthesis`.
