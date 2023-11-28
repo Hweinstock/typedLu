@@ -119,10 +119,12 @@ test_lTypeP :: Test
 test_lTypeP = 
   "Parsing lTypeP" ~:
     TestList 
-      [P.parse lTypeP "int" ~?= Right IntType, 
-       P.parse lTypeP "nil" ~?= Right NilType, 
+      [P.parse lTypeP "int " ~?= Right IntType, 
+       P.parse lTypeP "nil  " ~?= Right NilType, 
        P.parse lTypeP "string" ~?= Right StringType, 
-       P.parse lTypeP "boolean" ~?= Right BooleanType] 
+       P.parse lTypeP "boolean" ~?= Right BooleanType, 
+       P.parse (many lTypeP) "int boolean frog" ~?= Right [IntType, BooleanType], 
+       P.parse (many lTypeP) "string string   string turtle" ~?= Right [StringType, StringType, StringType]]
 -- END NEW TESTS
 test_tableConstP :: Test
 test_tableConstP =
