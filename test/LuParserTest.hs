@@ -98,6 +98,27 @@ test_callP =
     TestList 
       [] 
 
+-- TODO
+test_parameterP :: Test
+test_parameterP = 
+  "Parsing parameterP" ~:
+    TestList 
+      [] 
+
+-- TODO
+test_parametersP :: Test
+test_parametersP = 
+  "Parsing parametersP" ~: 
+    TestList 
+      [] 
+
+-- TODO
+test_lTypeP :: Test 
+test_lTypeP = 
+  "Parsing lTypeP" ~:
+    TestList 
+      [] 
+
 test_tableConstP :: Test
 test_tableConstP =
   "Parsing tableConst" ~:
@@ -184,7 +205,7 @@ test_stat =
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_callP, test_tableConstP, test_ParseFiles, test_comb, test_value, test_exp, test_stat]
+test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat]
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
