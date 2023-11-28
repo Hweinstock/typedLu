@@ -1,0 +1,13 @@
+x = 1 
+
+if x > 0 then 
+    z = true 
+else 
+    z = false 
+end 
+
+if (not z) then 
+    result = "world" 
+else 
+    result = "hello"
+end

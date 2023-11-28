@@ -48,7 +48,8 @@ test_if =
     "e2e testing if" ~:
         TestList 
           [
-            "if1" ~: testFile "test/lu/if1.lu" (checkVarValue "result" (IntVal 5))
+            "if1" ~: testFile "test/lu/if1.lu" (checkVarValue "result" (IntVal 5)), 
+            "if2" ~: testFile "test/lu/if2.lu" (checkVarValue "result" (StringVal "hello"))
           ]
 
 
