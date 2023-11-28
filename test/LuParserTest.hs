@@ -89,6 +89,15 @@ test_tableConstP =
         P.parse tableConstP "{ abc = 3, [2] = true, [4] = false, [9] = \"here\"}" ~?= Right (TableConst [FieldName "abc" (Val (IntVal 3)), FieldKey (Val (IntVal 2)) (Val (BoolVal True)), FieldKey (Val (IntVal 4)) (Val (BoolVal False)), FieldKey (Val (IntVal 9)) (Val (StringVal "here"))])
       ]
 
+test_functionCallP :: Test 
+test_functionCallP = 
+  "Parsing functionCall" ~: 
+    TestList 
+      [ P.parse functionCallP "foo()" ~?= Right (FunctionCall "foo" []),
+        P.parse functionCallP "foo(1, 2)" ~?= Right (FunctionCall "foo" [Val (IntVal 1), Val (IntVal 2)]),
+        P.parse functionCallP "foo(2+1, 2)" ~?= Right (FunctionCall "foo" [Op2 (Val (IntVal 2)) Plus (Val (IntVal 1)), Val (IntVal 2)])
+      ]
+
 test_ParseFiles :: Test
 test_ParseFiles =
   "parse files" ~:
@@ -167,7 +176,7 @@ test_stat =
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_tableConstP, test_ParseFiles, test_comb, test_value, test_exp, test_stat]
+test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_tableConstP, test_functionCallP, test_ParseFiles, test_comb, test_value, test_exp, test_stat]
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v

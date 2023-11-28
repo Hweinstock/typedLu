@@ -69,7 +69,7 @@ expP = compP
         <|> Op1 <$> uopP <*> uopexpP
     baseP =
       tableConstP
-        <|> functionCallP
+--      <|> functionCallP -- TODO: uncomment when functionCallP is implemented
         <|> Var <$> varP
         <|> parens expP
         <|> Val <$> valueP
