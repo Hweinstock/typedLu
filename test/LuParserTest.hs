@@ -203,10 +203,6 @@ test_stat =
         P.parse statementP "repeat ; ; until false"
           ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False))), 
         P.parse statementP "function foo(x: int): int return x + 5 end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))]))))
-        -- P.parse statementP "function foo(): int return 5 end" ~?= Right (Assign (Var (Name "foo")) (Val (FunctionVal [] IntType (Block [Return (Val (IntVal 5))])))), 
-        -- P.parse statementP "function foo(x: int, y: int): int return x + y end" ~?= Right (Assign (Var (Name "foo")) (Val (FunctionVal [("x", IntType), ("y", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Var (Name "y")))])))), 
-        -- P.parse statementP "function foo(): nil ; end" ~?= Right (Assign (Var (Name "foo")) (Val (FunctionVal [] NilType (Block [Empty])))), 
-        -- P.parse statementP "function foo(): string return \"Hello World \" end" ~?= Right (Assign (Var (Name "foo")) (Val (FunctionVal [] StringType (Block [Return (Val (StringVal "Hello World"))]))))
       ]
 
 test :: IO Counts
