@@ -62,3 +62,6 @@ test_function =
              "function2" ~: testFile "test/lu/function2.lu" (checkVarValue "z" (IntVal 11)), 
              "function3" ~: testFile "test/lu/function3.lu" (checkVarValue "z" (IntVal (-1))) 
            ]
+
+test :: IO Counts 
+test = runTestTT $ TestList [test_if, test_function]
