@@ -152,7 +152,7 @@ bopP =
     <|> constP ".." Concat
 
 parameterP :: Parser Parameter
-parameterP = undefined 
+parameterP = liftA2 (,) nameP (afterP ":" lTypeP)
 
 parametersP :: Parser [Parameter]
 parametersP = undefined 
