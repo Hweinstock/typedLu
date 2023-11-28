@@ -3,7 +3,7 @@ module LuParser where
 import Control.Applicative
 import Data.Char qualified as Char
 import LuSyntax
-import LuTypes (LType)
+import LuTypes
 import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
@@ -158,7 +158,10 @@ parametersP :: Parser [Parameter]
 parametersP = undefined 
 
 lTypeP :: Parser LType 
-lTypeP = undefined
+lTypeP = constP "nil" NilType
+   <|> constP "int" IntType 
+   <|> constP "string" StringType 
+   <|> constP "boolean" BooleanType
 
 functionP :: Parser Value 
 functionP = undefined
