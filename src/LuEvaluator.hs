@@ -124,6 +124,7 @@ evalE (Op1 o e) = do
   e' <- evalE e
   evalOp1 o e'
 evalE (TableConst _fs) = evalTableConst _fs
+evalE (Call fv ps) = undefined
 
 fieldToPair :: TableField -> State Store (Value, Value)
 fieldToPair (FieldName n exp) = do

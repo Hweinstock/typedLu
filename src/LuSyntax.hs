@@ -228,6 +228,7 @@ instance PP Value where
   pp NilVal = PP.text "nil"
   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
   pp (TableVal t) = PP.text "<" <> PP.text t <> PP.text ">"
+  pp (FunctionVal ps rt b) = undefined
 
 isBase :: Expression -> Bool
 isBase TableConst {} = True
@@ -261,6 +262,7 @@ instance PP Expression where
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
   pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
+  pp (Call fv ps) = undefined
 
 instance PP TableField where
   pp (FieldName name e) = pp name <+> PP.equals <+> pp e
@@ -465,6 +467,7 @@ instance Arbitrary Expression where
       ++ [Op2 e1 o e2' | e2' <- shrink e2]
       ++ [e1, e2]
   shrink (TableConst fs) = concatMap getExp fs ++ (TableConst <$> shrink fs)
+  shrink (Call fv ps) = undefined
 
 instance Arbitrary Uop where
   arbitrary = QC.arbitraryBoundedEnum
@@ -490,3 +493,4 @@ instance Arbitrary Value where
   shrink NilVal = []
   shrink (StringVal s) = StringVal <$> shrinkStringLit s
   shrink (TableVal _) = []
+  shrink (FunctionVal _ _ _) = []
