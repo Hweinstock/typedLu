@@ -86,7 +86,10 @@ test_functionP :: Test
 test_functionP = 
   "Parsing functionP" ~: 
     TestList 
-     [] 
+     [P.parse functionP "function (x: int): nil ; end " ~?= Right (FunctionVal [("x", IntType)] NilType (Block [Empty])), 
+      P.parse functionP "function (x: boolean, y: boolean): boolean return x end" ~?= Right (FunctionVal [("x", BooleanType), ("y", BooleanType)] BooleanType (Block [Return (Var (Name "x"))])), 
+      P.parse functionP "function (): string return \"hello world\" end" ~?= Right (FunctionVal [] StringType (Block [Return (Val (StringVal "hello world"))]))
+     ] 
 
 -- TODO
 test_callP :: Test 
