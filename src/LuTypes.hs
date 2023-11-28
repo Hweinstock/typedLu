@@ -11,4 +11,4 @@ data LType =
     | TableType LType LType -- What about a table as a key??
     | UnionType LType LType 
     | FunctionType LType LType -- Partial Function 
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)

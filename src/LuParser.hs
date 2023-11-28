@@ -69,7 +69,6 @@ expP = compP
         <|> Op1 <$> uopP <*> uopexpP
     baseP =
       tableConstP
---      <|> functionCallP -- TODO: uncomment when functionCallP is implemented
         <|> Var <$> varP
         <|> parens expP
         <|> Val <$> valueP
@@ -151,8 +150,11 @@ bopP =
     <|> constP "<" Lt
     <|> constP ".." Concat
 
-functionCallP :: Parser Expression 
-functionCallP = undefined
+functionP :: Parser Value 
+functionP = undefined
+
+callP :: Parser Expression
+callP = undefined
 
 tableConstP :: Parser Expression
 tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
