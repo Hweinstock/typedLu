@@ -69,9 +69,11 @@ expP = compP
         <|> Op1 <$> uopP <*> uopexpP
     baseP =
       tableConstP
+        <|> functionCallP
         <|> Var <$> varP
         <|> parens expP
         <|> Val <$> valueP
+        
 
 -- | Parse an operator at a specified precedence level
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
@@ -148,6 +150,9 @@ bopP =
     <|> constP "<=" Le
     <|> constP "<" Lt
     <|> constP ".." Concat
+
+functionCallP :: Parser Expression 
+functionCallP = undefined
 
 tableConstP :: Parser Expression
 tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))

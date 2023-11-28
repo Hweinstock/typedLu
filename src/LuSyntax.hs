@@ -36,6 +36,7 @@ data Expression
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
   | TableConst [TableField] -- table construction, { x = 3 , y = 5 }
+  | FunctionCall Name [Expression] -- foo(x, y)
   deriving (Eq, Show)
 
 data Value
@@ -246,6 +247,7 @@ instance PP Expression where
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
   pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
+  pp (FunctionCall n ps) = undefined
 
 instance PP TableField where
   pp (FieldName name e) = pp name <+> PP.equals <+> pp e
@@ -452,6 +454,7 @@ instance Arbitrary Expression where
       ++ [Op2 e1 o e2' | e2' <- shrink e2]
       ++ [e1, e2]
   shrink (TableConst fs) = concatMap getExp fs ++ (TableConst <$> shrink fs)
+  shrink (FunctionCall n ps) = undefined
 
 instance Arbitrary Uop where
   arbitrary = QC.arbitraryBoundedEnum
