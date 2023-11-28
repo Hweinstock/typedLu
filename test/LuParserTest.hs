@@ -4,6 +4,7 @@ import Control.Applicative
 import Parser qualified as P
 import Parser (Parser)
 import LuSyntax
+import LuTypes
 import Test.QuickCheck qualified as QC
 import LuParser as LP
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
@@ -157,7 +158,12 @@ test_stat =
         P.parse statementP "while nil do end"
           ~?= Right (While (Val NilVal) (Block [])),
         P.parse statementP "repeat ; ; until false"
-          ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False)))
+          ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False))), 
+        P.parse statementP "function foo(x: int): int return x + 5 end" ~?= Right (FunctionDef [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])), 
+        P.parse statementP "function foo(): int return 5 end" ~?= Right (FunctionDef [] IntType (Block [Return (Val (IntVal 5))])), 
+        P.parse statementP "function foo(x: int, y: int): int return x + y end" ~?= Right (FunctionDef [("x", IntType), ("y", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Var (Name "y")))])), 
+        P.parse statementP "function foo(): nil ; end" ~?= Right (FunctionDef [] NilType (Block [Empty])), 
+        P.parse statementP "function foo(): string return \"Hello World \" end" ~?= Right (FunctionDef [] StringType (Block [Return (Val (StringVal "Hello World"))])) 
       ]
 
 test :: IO Counts
