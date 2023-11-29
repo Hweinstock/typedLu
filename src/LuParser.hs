@@ -155,7 +155,7 @@ parameterP :: Parser Parameter
 parameterP = liftA2 (,) nameP (afterP ":" lTypeP)
 
 parametersP :: Parser [Parameter]
-parametersP = undefined 
+parametersP = parens $ P.sepBy parameterP (wsP (P.char ','))
 
 lTypeP :: Parser LType 
 lTypeP = constP "nil" NilType
