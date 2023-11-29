@@ -166,6 +166,9 @@ functionP = undefined
 callP :: Parser Expression
 callP = undefined
 
+returnP :: Parser Statement 
+returnP = undefined 
+
 tableConstP :: Parser Expression
 tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
   where
