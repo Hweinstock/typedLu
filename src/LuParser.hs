@@ -170,7 +170,7 @@ callP :: Parser Expression
 callP = undefined
 
 returnP :: Parser Statement 
-returnP = undefined 
+returnP = Return <$> (afterP "return" expP) 
 
 tableConstP :: Parser Expression
 tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
