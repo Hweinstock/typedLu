@@ -167,7 +167,7 @@ functionP :: Parser Value
 functionP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
 
 callP :: Parser Expression
-callP = undefined
+callP = liftA2 Call varP (parens (P.sepBy expP (wsP (P.char ','))))
 
 returnP :: Parser Statement 
 returnP = Return <$> (afterP "return" expP) 
@@ -184,10 +184,14 @@ tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
         fieldKeyP = liftA2 FieldKey (brackets expP) (afterP "=" expP)
 
 statementP :: Parser Statement
-statementP = wsP (assignP <|> ifP <|> whileP <|> emptyP <|> repeatP)
+statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
   where
     assignP :: Parser Statement
     assignP = Assign <$> varP <*> (stringP "=" *> expP)
+    functionAssignP :: Parser Statement 
+    functionAssignP = liftA2 Assign (Name <$> (afterP "function" nameP)) (Val <$> unnamedFunctionP) where 
+      unnamedFunctionP :: Parser Value
+      unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
     ifP :: Parser Statement
     ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
     whileP :: Parser Statement
