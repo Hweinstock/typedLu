@@ -46,7 +46,7 @@ CP1:
 - [ ] Unit tests for `checker`.
 - [ ] quickCheck tests for `checker`.
 - [x] Outline function implementation in parser w/ unit tests.
-- [ ] Outline function implementation in evaluator w/ unit tests.
+- [x] Outline function implementation in evaluator w/ unit tests.
 
 CP2:
 - [ ] Implement arbitrary and shrink for `LType`.
