@@ -164,7 +164,7 @@ lTypeP = constP "nil" NilType
    <|> constP "boolean" BooleanType
 
 functionP :: Parser Value 
-functionP = undefined
+functionP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
 
 callP :: Parser Expression
 callP = undefined
