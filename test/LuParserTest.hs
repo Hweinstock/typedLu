@@ -125,6 +125,16 @@ test_lTypeP =
        P.parse lTypeP "boolean" ~?= Right BooleanType, 
        P.parse (many lTypeP) "int boolean frog" ~?= Right [IntType, BooleanType], 
        P.parse (many lTypeP) "string string   string turtle" ~?= Right [StringType, StringType, StringType]]
+
+test_returnP :: Test 
+test_returnP = 
+  "Parsing returnP" ~: 
+    TestList 
+     [
+      P.parse returnP "return x+5" ~?= Right (Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))), 
+      P.parse returnP "return 0" ~?= Right (Return (Val (IntVal 0))), 
+      P.parse returnP "return not true" ~?= Right (Return (Op1 Not (Val (BoolVal True)))) 
+     ]
 -- END NEW TESTS
 test_tableConstP :: Test
 test_tableConstP =
@@ -210,7 +220,7 @@ test_stat =
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat]
+test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat]
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
