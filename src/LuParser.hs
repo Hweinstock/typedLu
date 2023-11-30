@@ -70,6 +70,7 @@ expP = compP
         <|> Op1 <$> uopP <*> uopexpP
     baseP =
       tableConstP
+        <|> callP
         <|> Var <$> varP
         <|> parens expP
         <|> Val <$> valueP
