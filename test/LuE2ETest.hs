@@ -18,13 +18,20 @@ runFileForStore fp = do
             let finalState = S.execState (eval ast) initialStore
             return $ Right finalState
 
--- | Check if variable holds value in store. 
-checkVarValue :: String -> Value -> Store -> Either String Bool 
-checkVarValue targetName targetValue s = case Map.lookup globalTableName s of 
+checkVarProperty :: String -> (Value -> Bool) -> Store -> Either String Bool 
+checkVarProperty targetName property s = case Map.lookup globalTableName s of 
     Nothing -> Left "Failed to find global table."
     Just globalTable -> case Map.lookup (StringVal targetName) globalTable of 
         Nothing -> Left ("Failed to find" ++ targetName ++  "variable")
-        Just v -> Right $ v == targetValue
+        Just v -> Right $ property v
+
+-- | Check if variable holds value in store. 
+checkVarValueInStore :: String -> Value -> Store -> Either String Bool 
+checkVarValueInStore targetName targetValue = checkVarProperty targetName (== targetValue)
+
+-- | Check if variable holds value in store. 
+checkVarExistsInStore :: String -> Store -> Either String Bool 
+checkVarExistsInStore targetName = checkVarProperty targetName (const True)
 
 -- | Apply target function to final store of given file. 
 -- Ex. checkFileOutputStore "test/lu/if1.lu" (checkVarValue "result" (IntVal 5)) ==> Right True
@@ -48,8 +55,8 @@ test_if =
     "e2e testing if" ~:
         TestList 
           [
-            "if1" ~: testFile "test/lu/if1.lu" (checkVarValue "result" (IntVal 5)), 
-            "if2" ~: testFile "test/lu/if2.lu" (checkVarValue "result" (StringVal "hello"))
+            "if1" ~: testFile "test/lu/if1.lu" (checkVarValueInStore "result" (IntVal 5)), 
+            "if2" ~: testFile "test/lu/if2.lu" (checkVarValueInStore "result" (StringVal "hello"))
           ]
 
 
@@ -58,9 +65,9 @@ test_function =
     "e2e function" ~: 
         TestList 
            [
-             "function1" ~: testFile "test/lu/function1.lu" (\s -> Right True), -- basically just check it parses the function. 
-             "function2" ~: testFile "test/lu/function2.lu" (checkVarValue "z" (IntVal 11)), 
-             "function3" ~: testFile "test/lu/function3.lu" (checkVarValue "z" (IntVal (-1))) 
+             "function1" ~: testFile "test/lu/function1.lu" (checkVarExistsInStore "foo"), 
+             "function2" ~: testFile "test/lu/function2.lu" (checkVarValueInStore "z" (IntVal 11)), 
+             "function3" ~: testFile "test/lu/function3.lu" (checkVarValueInStore "z" (IntVal (-1))) 
            ]
 
 test :: IO Counts 
