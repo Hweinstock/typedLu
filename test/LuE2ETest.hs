@@ -66,7 +66,7 @@ test_function =
         TestList 
            [
              "function1" ~: testFile "test/lu/function1.lu" (checkVarExistsInStore "foo"), 
-             "function2" ~: testFile "test/lu/function2.lu" (checkVarValueInStore "z" (IntVal 11)), 
+             "function2" ~: testFile "test/lu/function2.lu" (checkVarValueInStore "z" (IntVal 11) >> checkVarValueInStore "x1" NilVal), 
              "function3" ~: testFile "test/lu/function3.lu" (checkVarValueInStore "z" (IntVal (-1))), 
              "function4" ~: testFile "test/lu/function4.lu" (checkVarValueInStore "z" (IntVal 5)) 
            ]

@@ -124,11 +124,35 @@ evalE (Op1 o e) = do
   e' <- evalE e
   evalOp1 o e'
 evalE (TableConst _fs) = evalTableConst _fs
-evalE (Call func ps) = do 
-  fv <- evalE (Var func)
+evalE (Call func pps) = do 
+  fv <- evalE (Var func) 
   case fv of 
-    (FunctionVal ps2 rt b) -> evalFunc b
+    (FunctionVal ps rt b) -> do 
+      setParameters pps ps
+      evalFunc b
+      -- Need to unset parameters? 
     _ -> return NilVal
+
+setParameters :: [Expression] -> [Parameter] -> State Store () 
+setParameters pps ps = do 
+  let valuesStore = foldr seqEval (return []) pps
+  values <- valuesStore
+  let pNames = map fst ps
+  foldr seqSet (return ()) (zip values pNames)
+  --return ()
+
+  where 
+    seqEval :: Expression -> State Store [Value] -> State Store [Value]
+    seqEval e s = do 
+      curValues <- s
+      newValue <- evalE e 
+      return (newValue : curValues)
+    
+    seqSet :: (Value, Name) -> State Store () -> State Store () 
+    seqSet p@(v, n) s = s >> setParameter p
+
+setParameter :: (Value, Name) -> State Store () 
+setParameter (v, n) = evalS (Assign (Name n) (Val v))
 
 fieldToPair :: TableField -> State Store (Value, Value)
 fieldToPair (FieldName n exp) = do
