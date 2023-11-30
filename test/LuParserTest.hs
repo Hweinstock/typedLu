@@ -231,6 +231,7 @@ prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
 prop_roundtrip_exp :: Expression -> Bool
 prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 
+-- Currently fails 1/3 of the time. 
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 
