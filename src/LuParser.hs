@@ -161,6 +161,7 @@ parametersP = parens $ P.sepBy parameterP (wsP (P.char ','))
 lTypeP :: Parser LType 
 lTypeP = liftA2 UnionType baseTypeP (afterP "|" lTypeP)
  <|> liftA2 FunctionType baseTypeP (afterP "->" lTypeP)
+ <|> liftA2 TableType (afterP "{" (baseTypeP <|> lTypeP)) (afterP ":" lTypeP) <* stringP "}"
  <|> baseTypeP
  where 
   baseTypeP :: Parser LType 
