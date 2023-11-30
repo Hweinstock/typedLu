@@ -123,6 +123,9 @@ test_lTypeP =
        P.parse lTypeP "nil  " ~?= Right NilType, 
        P.parse lTypeP "string" ~?= Right StringType, 
        P.parse lTypeP "boolean" ~?= Right BooleanType, 
+       P.parse lTypeP "int | string" ~?= Right (UnionType IntType StringType),
+       P.parse lTypeP "int | nil" ~?= Right (UnionType IntType NilType),
+       P.parse lTypeP "int | string | boolean" ~?= Right (UnionType IntType (UnionType StringType BooleanType)),
        P.parse (many lTypeP) "int boolean frog" ~?= Right [IntType, BooleanType], 
        P.parse (many lTypeP) "string string   string turtle" ~?= Right [StringType, StringType, StringType]]
 

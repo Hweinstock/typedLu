@@ -159,7 +159,10 @@ parametersP :: Parser [Parameter]
 parametersP = parens $ P.sepBy parameterP (wsP (P.char ','))
 
 lTypeP :: Parser LType 
-lTypeP = constP "nil" NilType
+lTypeP = liftA2 UnionType baseTypeP (afterP "|" lTypeP) <|> baseTypeP
+
+baseTypeP :: Parser LType 
+baseTypeP = constP "nil" NilType
    <|> constP "int" IntType 
    <|> constP "string" StringType 
    <|> constP "boolean" BooleanType
