@@ -31,7 +31,7 @@ brackets :: Parser a -> Parser a
 brackets x = P.between (stringP "[") x (stringP "]")
 
 valueP :: Parser Value
-valueP = intValP <|> boolValP <|> nilValP <|> stringValP
+valueP = intValP <|> boolValP <|> nilValP <|> stringValP <|> functionValP
 
 intValP :: Parser Value
 intValP = IntVal <$> wsP P.int
@@ -163,8 +163,8 @@ lTypeP = constP "nil" NilType
    <|> constP "string" StringType 
    <|> constP "boolean" BooleanType
 
-functionP :: Parser Value 
-functionP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
+functionValP :: Parser Value 
+functionValP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
 
 callP :: Parser Expression
 callP = liftA2 Call varP (parens (P.sepBy expP (wsP (P.char ','))))
