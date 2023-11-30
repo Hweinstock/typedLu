@@ -123,6 +123,16 @@ test_lTypeP =
        P.parse lTypeP "nil  " ~?= Right NilType, 
        P.parse lTypeP "string" ~?= Right StringType, 
        P.parse lTypeP "boolean" ~?= Right BooleanType, 
+       P.parse lTypeP "int | string" ~?= Right (UnionType IntType StringType),
+       P.parse lTypeP "int | nil" ~?= Right (UnionType IntType NilType),
+       P.parse lTypeP "int | string | boolean" ~?= Right (UnionType IntType (UnionType StringType BooleanType)),
+       P.parse lTypeP "int -> string" ~?= Right (FunctionType IntType StringType), 
+       P.parse lTypeP "nil -> string -> boolean" ~?= Right (FunctionType NilType (FunctionType StringType BooleanType)),
+       P.parse lTypeP "string -> string -> string -> string" ~?= Right (FunctionType StringType (FunctionType StringType (FunctionType StringType StringType))),
+       P.parse lTypeP "{string : int}" ~?= Right (TableType StringType IntType), 
+       P.parse lTypeP "{int : int | string}" ~?= Right (TableType IntType (UnionType IntType StringType)),
+       P.parse lTypeP "{int : {int : string}}" ~?= Right (TableType IntType (TableType IntType StringType)),
+       P.parse lTypeP "{{int : int} : {int : string}}" ~?= Right (TableType (TableType IntType IntType) (TableType IntType StringType)),
        P.parse (many lTypeP) "int boolean frog" ~?= Right [IntType, BooleanType], 
        P.parse (many lTypeP) "string string   string turtle" ~?= Right [StringType, StringType, StringType]]
 
@@ -231,6 +241,7 @@ prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
 prop_roundtrip_exp :: Expression -> Bool
 prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 
+-- Currently fails 1/3 of the time. 
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 

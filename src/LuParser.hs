@@ -159,10 +159,16 @@ parametersP :: Parser [Parameter]
 parametersP = parens $ P.sepBy parameterP (wsP (P.char ','))
 
 lTypeP :: Parser LType 
-lTypeP = constP "nil" NilType
-   <|> constP "int" IntType 
-   <|> constP "string" StringType 
-   <|> constP "boolean" BooleanType
+lTypeP = liftA2 UnionType baseTypeP (afterP "|" lTypeP)
+ <|> liftA2 FunctionType baseTypeP (afterP "->" lTypeP)
+ <|> liftA2 TableType (afterP "{" (baseTypeP <|> lTypeP)) (afterP ":" lTypeP) <* stringP "}"
+ <|> baseTypeP
+ where 
+  baseTypeP :: Parser LType 
+  baseTypeP = constP "nil" NilType
+    <|> constP "int" IntType 
+    <|> constP "string" StringType 
+    <|> constP "boolean" BooleanType
 
 functionValP :: Parser Value 
 functionValP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
