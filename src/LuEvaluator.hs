@@ -124,7 +124,11 @@ evalE (Op1 o e) = do
   e' <- evalE e
   evalOp1 o e'
 evalE (TableConst _fs) = evalTableConst _fs
-evalE (Call fv ps) = undefined
+evalE (Call func ps) = do 
+  fv <- evalE (Var func)
+  case fv of 
+    (FunctionVal ps2 rt b) -> evalFunc b
+    _ -> return NilVal
 
 fieldToPair :: TableField -> State Store (Value, Value)
 fieldToPair (FieldName n exp) = do
@@ -198,6 +202,12 @@ toBool _ = True
 eval :: Block -> State Store ()
 eval (Block ss) = mapM_ evalS ss
 
+evalFunc :: Block -> State Store Value 
+evalFunc (Block []) = return NilVal
+evalFunc (Block (s : ss)) = case s of 
+  (Return e) -> evalE e 
+  _ -> evalS s >> evalFunc (Block ss)
+
 -- | Statement evaluator
 evalS :: Statement -> State Store ()
 evalS (If e s1 s2) = do
@@ -217,7 +227,7 @@ evalS (Assign v e) = do
     Just ref -> update ref e'
     _ -> return ()
 evalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-evalS (Return e) = undefined
+evalS (Return e) = return () -- do nothing since we aren't in function. 
 evalS Empty = return () -- do nothing
 
 exec :: Block -> Store -> Store
