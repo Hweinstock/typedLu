@@ -109,3 +109,16 @@ test_checkerOp2 =
                 checker (Op2 (Var (Name "string")) Concat (Var (Name "string"))) StringType store ~?= True,
                 checker (Op2 (Var (Name "string")) Concat (Var (Name "int"))) StringType store ~?= False
             ]
+
+-- Test checker function with TableConst as input
+test_checkerTableConst :: Test
+test_checkerTableConst =
+    "checker TableConst" ~:
+        TestList
+            [ 
+                checker (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "int"))]) (TableType StringType IntType) store ~?= True,
+                checker (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) (TableType StringType IntType) store ~?= False,
+                checker (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) (TableType StringType IntType) store ~?= True,
+                checker (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) (TableType StringType IntType) store ~?= False,
+                checker (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) (TableType StringType IntType) store ~?= False
+            ]
