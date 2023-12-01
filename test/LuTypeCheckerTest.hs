@@ -79,3 +79,33 @@ test_checkerOp1 =
                 checker (Op1 Len (Var (Name "string"))) IntType store ~?= True,
                 checker (Op1 Len (Var (Name "int"))) IntType store ~?= False
             ]
+
+-- Test checker function with Op2 as input
+test_checkerOp2 :: Test
+test_checkerOp2 =
+    "checker Op2" ~:
+        TestList
+            [ 
+                checker (Op2 (Var (Name "int")) Plus (Var (Name "int"))) IntType store ~?= True,
+                checker (Op2 (Var (Name "string")) Plus (Var (Name "int"))) IntType store ~?= False,
+                checker (Op2 (Var (Name "int")) Minus (Var (Name "int"))) IntType store ~?= True,
+                checker (Op2 (Var (Name "boolean")) Minus (Var (Name "int"))) IntType store ~?= False,
+                checker (Op2 (Var (Name "int")) Times (Var (Name "int"))) IntType store ~?= True,
+                checker (Op2 (Var (Name "string")) Times (Var (Name "int"))) IntType store ~?= False,
+                checker (Op2 (Var (Name "int")) Divide (Var (Name "int"))) IntType store ~?= True,
+                checker (Op2 (Var (Name "boolean")) Divide (Var (Name "int"))) IntType store ~?= False,
+                checker (Op2 (Var (Name "int")) Modulo (Var (Name "int"))) IntType store ~?= True,
+                checker (Op2 (Var (Name "string")) Modulo (Var (Name "int"))) IntType store ~?= False,
+                checker (Op2 (Var (Name "int")) Eq (Var (Name "int"))) BoolVal store ~?= True,
+                checker (Op2 (Var (Name "int")) Eq (Var (Name "string"))) BoolVal store ~?= False,
+                checker (Op2 (Var (Name "string")) Gt (Var (Name "string"))) BoolVal store ~?= True,
+                checker (Op2 (Var (Name "string")) Gt (Var (Name "boolean"))) BoolVal store ~?= False,
+                checker (Op2 (Var (Name "boolean")) Ge (Var (Name "boolean"))) BoolVal store ~?= True,
+                checker (Op2 (Var (Name "boolean")) Ge (Var (Name "int"))) BoolVal store ~?= False,
+                checker (Op2 (Var (Name "string")) Lt (Var (Name "string"))) BoolVal store ~?= True,
+                checker (Op2 (Var (Name "string")) Lt (Var (Name "int"))) BoolVal store ~?= False,
+                checker (Op2 (Var (Name "boolean")) Le (Var (Name "boolean"))) BoolVal store ~?= True,
+                checker (Op2 (Var (Name "boolean")) Le (Var (Name "string"))) BoolVal store ~?= False,
+                checker (Op2 (Var (Name "string")) Concat (Var (Name "string"))) StringVal store ~?= True,
+                checker (Op2 (Var (Name "string")) Concat (Var (Name "int"))) StringVal store ~?= False
+            ]
