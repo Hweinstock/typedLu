@@ -82,7 +82,8 @@ test_function =
              "function6" ~: testFile "test/lu/function6.lu" (checkVarValuesInStore [("f", BoolVal False), ("z", IntVal 1)]), 
              "recFunction" ~: testFile "test/lu/recFunction.lu" (checkVarValueInStore "z" (IntVal 720)), 
              "weirdScopesFunc" ~: testFile "test/lu/weirdScopesFunc.lu" (checkVarValuesInStore [("result", IntVal 18), ("result2", IntVal 12)]), 
-             "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo")
+             "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"), 
+             "function7" ~: testFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)])
            ]
 
 test :: IO Counts 
