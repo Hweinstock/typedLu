@@ -48,3 +48,20 @@ test_checkerVar =
                 checker (Var (Name "function2")) (FunctionType IntType StringType) store ~?= False,
                 checker (Var (Name "function3")) (FunctionType IntType StringType) store ~?= False
             ]
+
+-- Test checker function with Val as input
+test_checkerVal :: Test
+test_checkerVal =
+    "checker Val" ~:
+        TestList
+            [ 
+                checker (Val (IntVal 0)) IntType store ~?= True,
+                checker (Val (StringVal "")) IntType store ~?= False,
+                checker (Val (StringVal "")) StringType store ~?= True,
+                checker (Val (IntVal 0)) StringType store ~?= False,
+                checker (Val (BoolVal True)) BooleanType store ~?= True,
+                checker (Val (IntVal 0)) BooleanType store ~?= False,
+                checker (Val (FunctionVal [("x", IntType)] StringType (Block []))) (FunctionType IntType StringType) store ~?= True,
+                checker (Val (FunctionVal [("x", StringType)] StringType (Block []))) (FunctionType IntType StringType) store ~?= False,
+                checker (Val (FunctionVal [("x", IntType)] IntType (Block []))) (FunctionType IntType StringType) store ~?= False
+            ]
