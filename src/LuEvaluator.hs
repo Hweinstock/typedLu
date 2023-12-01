@@ -21,8 +21,22 @@ globalTableName = "_G"
 returnValueName :: Name 
 returnValueName = "_R"
 
-terminationFlagName :: Name 
-terminationFlagName = "_T"
+returnValueRef :: Reference
+returnValueRef = (globalTableName, StringVal returnValueName)
+
+returnFlagName :: Name 
+returnFlagName = "_F"
+
+returnFlagRef :: Reference
+returnFlagRef = (globalTableName, StringVal returnFlagName)
+
+isReturnFlagSet :: State Store Bool 
+isReturnFlagSet = do 
+  currentState <- S.get
+  value <- evalE (Var (Name returnFlagName))
+  return $ case value of 
+    (BoolVal True) -> True 
+    _ -> False
 
 initialStore :: Store
 initialStore = Map.singleton globalTableName Map.empty
@@ -138,11 +152,16 @@ evalE (Call func pps) = do
       let pOrigValuesVars = map (Var . Name) parameterNames
       pOrigValues <- seqEval pOrigValuesVars
 
-      setVars parameterNames pps -- Initialize variables as values. 
+      -- Initialize parameters as values. 
+      setVars parameterNames pps 
       eval b
       returnValue <- evalE (Var (Name returnValueName))
-      setVars parameterNames (map Val pOrigValues) -- Uninitialize variables back to what they were. 
-      setVars [returnValueName] [Val NilVal]
+      -- Reset Flags/ReturnValue
+      update returnValueRef NilVal 
+      update returnFlagRef (BoolVal False)
+
+      -- Unscope Parameters i.e. NilValue them. 
+      setVars parameterNames (map Val pOrigValues)
       return returnValue
     _ -> return NilVal
 
@@ -239,25 +258,28 @@ eval (Block ss) = mapM_ evalS ss
 
 -- | Statement evaluator
 evalS :: Statement -> State Store ()
-evalS (If e s1 s2) = do
-  v <- evalE e
-  if toBool v then eval s1 else eval s2
-evalS w@(While e ss) = do
-  v <- evalE e
-  when (toBool v) $ do
-    eval ss
-    evalS w
-evalS (Assign v e) = do
-  -- update global variable or table field v to value of e
-  s <- S.get
-  mRef <- resolveVar v
-  e' <- evalE e
-  case mRef of
-    Just ref -> update ref e'
-    _ -> return ()
-evalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-evalS (Return e) = evalS (Assign (Name returnValueName) e)
-evalS Empty = return () -- do nothing
+evalS s = do 
+  didReturn <- isReturnFlagSet 
+  if didReturn then return () else doEvalS s where 
+    doEvalS (If e s1 s2) = do
+      v <- evalE e
+      if toBool v then eval s1 else eval s2
+    doEvalS w@(While e ss) = do
+      v <- evalE e
+      when (toBool v) $ do
+        eval ss
+        evalS w
+    doEvalS (Assign v e) = do
+      -- update global variable or table field v to value of e
+      s <- S.get
+      mRef <- resolveVar v
+      e' <- evalE e
+      case mRef of
+        Just ref -> update ref e'
+        _ -> return ()
+    doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
+    doEvalS (Return e) = evalS (Assign (Name returnValueName) e) >> evalS (Assign (Name returnFlagName) (Val (BoolVal True)))
+    doEvalS Empty = return () -- do nothing
 
 exec :: Block -> Store -> Store
 exec = S.execState . eval

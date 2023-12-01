@@ -1,0 +1,8 @@
+f = false
+function foo(x : int, y: int) : int 
+    return x
+    f = true
+    return y
+end 
+
+z = foo(1, 2)
