@@ -47,8 +47,10 @@ CP1:
 - [x] quickCheck tests for `checker`.
 - [x] Outline function implementation in parser w/ unit tests.
 - [x] Outline function implementation in evaluator w/ unit tests.
+- [x] Add tests for union types with explicit type signatures.
 
 CP2:
+- [ ] Require tables to be type annotated. 
 - [ ] Implement arbitrary and shrink for `LType`.
 - [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
 - [x] Add more advanced types to the parser (table, functions, unions)
@@ -56,11 +58,13 @@ CP2:
 - [ ] Extend E2E tests to include type checking step. 
 - [ ] Implement `checker`. 
 - [ ] Implement `synthesis`.
+- [ ] Implement `typeCheckBlock` and `typeCheckStatement`.
 - [ ] Augment parser to accept optional type signatures.
-- [ ] Add tests for union types with explicit type signatures.
+- [ ] Handle optional type signatures in evaluator and in type checker. 
 Potential Extensions:
-- [ ] Other things?
 - [ ] User Defined types?
+- [ ] Allow optional types in tables and functions. 
+- [ ] Other things?
 
 ## Questions for Nick 
 - Should the typechecker error or return a boolean? We currently error so that we can provide more useful info.
