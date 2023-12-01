@@ -3,7 +3,7 @@ module LuParser where
 import Control.Applicative
 import Data.Char qualified as Char
 import LuSyntax
-import LuTypes (LType)
+import LuTypes
 import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
@@ -31,7 +31,7 @@ brackets :: Parser a -> Parser a
 brackets x = P.between (stringP "[") x (stringP "]")
 
 valueP :: Parser Value
-valueP = intValP <|> boolValP <|> nilValP <|> stringValP
+valueP = intValP <|> boolValP <|> nilValP <|> stringValP <|> functionValP
 
 intValP :: Parser Value
 intValP = IntVal <$> wsP P.int
@@ -70,6 +70,7 @@ expP = compP
         <|> Op1 <$> uopP <*> uopexpP
     baseP =
       tableConstP
+        <|> callP
         <|> Var <$> varP
         <|> parens expP
         <|> Val <$> valueP
@@ -152,22 +153,31 @@ bopP =
     <|> constP ".." Concat
 
 parameterP :: Parser Parameter
-parameterP = undefined 
+parameterP = liftA2 (,) nameP (afterP ":" lTypeP)
 
 parametersP :: Parser [Parameter]
-parametersP = undefined 
+parametersP = parens $ P.sepBy parameterP (wsP (P.char ','))
 
 lTypeP :: Parser LType 
-lTypeP = undefined
+lTypeP = liftA2 UnionType baseTypeP (afterP "|" lTypeP)
+ <|> liftA2 FunctionType baseTypeP (afterP "->" lTypeP)
+ <|> liftA2 TableType (afterP "{" (baseTypeP <|> lTypeP)) (afterP ":" lTypeP) <* stringP "}"
+ <|> baseTypeP
+ where 
+  baseTypeP :: Parser LType 
+  baseTypeP = constP "nil" NilType
+    <|> constP "int" IntType 
+    <|> constP "string" StringType 
+    <|> constP "boolean" BooleanType
 
-functionP :: Parser Value 
-functionP = undefined
+functionValP :: Parser Value 
+functionValP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
 
 callP :: Parser Expression
-callP = undefined
+callP = liftA2 Call varP (parens (P.sepBy expP (wsP (P.char ','))))
 
 returnP :: Parser Statement 
-returnP = undefined 
+returnP = Return <$> (afterP "return" expP) 
 
 tableConstP :: Parser Expression
 tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
@@ -181,10 +191,14 @@ tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
         fieldKeyP = liftA2 FieldKey (brackets expP) (afterP "=" expP)
 
 statementP :: Parser Statement
-statementP = wsP (assignP <|> ifP <|> whileP <|> emptyP <|> repeatP)
+statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
   where
     assignP :: Parser Statement
     assignP = Assign <$> varP <*> (stringP "=" *> expP)
+    functionAssignP :: Parser Statement 
+    functionAssignP = liftA2 Assign (Name <$> (afterP "function" nameP)) (Val <$> unnamedFunctionP) where 
+      unnamedFunctionP :: Parser Value
+      unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
     ifP :: Parser Statement
     ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
     whileP :: Parser Statement

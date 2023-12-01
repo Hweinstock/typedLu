@@ -50,7 +50,8 @@ CP1:
 
 CP2:
 - [ ] Implement arbitrary and shrink for `LType`.
-- [ ] Modify parser to parse functions.
+- [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
+- [x] Add more advanced types to the parser (table, functions, unions)
 - [ ] Modify evaluator to evaluate functions.
 - [ ] Extend E2E tests to include type checking step. 
 - [ ] Implement `checker`. 

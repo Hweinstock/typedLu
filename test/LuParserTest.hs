@@ -85,9 +85,9 @@ test_functionP :: Test
 test_functionP = 
   "Parsing functionP" ~: 
     TestList 
-     [P.parse functionP "function (x: int): nil ; end " ~?= Right (FunctionVal [("x", IntType)] NilType (Block [Empty])), 
-      P.parse functionP "function (x: boolean, y: boolean): boolean return x end" ~?= Right (FunctionVal [("x", BooleanType), ("y", BooleanType)] BooleanType (Block [Return (Var (Name "x"))])), 
-      P.parse functionP "function (): string return \"hello world\" end" ~?= Right (FunctionVal [] StringType (Block [Return (Val (StringVal "hello world"))]))
+     [P.parse functionValP "function (x: int): nil ; end " ~?= Right (FunctionVal [("x", IntType)] NilType (Block [Empty])), 
+      P.parse functionValP "function (x: boolean, y: boolean): boolean return x end" ~?= Right (FunctionVal [("x", BooleanType), ("y", BooleanType)] BooleanType (Block [Return (Var (Name "x"))])), 
+      P.parse functionValP "function (): string return \"hello world\" end" ~?= Right (FunctionVal [] StringType (Block [Return (Val (StringVal "hello world"))]))
      ] 
 
 test_callP :: Test 
@@ -123,6 +123,16 @@ test_lTypeP =
        P.parse lTypeP "nil  " ~?= Right NilType, 
        P.parse lTypeP "string" ~?= Right StringType, 
        P.parse lTypeP "boolean" ~?= Right BooleanType, 
+       P.parse lTypeP "int | string" ~?= Right (UnionType IntType StringType),
+       P.parse lTypeP "int | nil" ~?= Right (UnionType IntType NilType),
+       P.parse lTypeP "int | string | boolean" ~?= Right (UnionType IntType (UnionType StringType BooleanType)),
+       P.parse lTypeP "int -> string" ~?= Right (FunctionType IntType StringType), 
+       P.parse lTypeP "nil -> string -> boolean" ~?= Right (FunctionType NilType (FunctionType StringType BooleanType)),
+       P.parse lTypeP "string -> string -> string -> string" ~?= Right (FunctionType StringType (FunctionType StringType (FunctionType StringType StringType))),
+       P.parse lTypeP "{string : int}" ~?= Right (TableType StringType IntType), 
+       P.parse lTypeP "{int : int | string}" ~?= Right (TableType IntType (UnionType IntType StringType)),
+       P.parse lTypeP "{int : {int : string}}" ~?= Right (TableType IntType (TableType IntType StringType)),
+       P.parse lTypeP "{{int : int} : {int : string}}" ~?= Right (TableType (TableType IntType IntType) (TableType IntType StringType)),
        P.parse (many lTypeP) "int boolean frog" ~?= Right [IntType, BooleanType], 
        P.parse (many lTypeP) "string string   string turtle" ~?= Right [StringType, StringType, StringType]]
 
@@ -215,8 +225,11 @@ test_stat =
         P.parse statementP "repeat ; ; until false"
           ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False))), 
         P.parse statementP "function foo(x: int): int return x + 5 end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))), 
+        P.parse statementP "foo = function (x: int): int return x + 5 end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))),
         P.parse statementP "function foo(): nil ; end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [] NilType (Block [Empty])))), 
-        P.parse statementP "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))]))))
+        P.parse statementP "foo = function (): nil ; end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [] NilType (Block [Empty])))),
+        P.parse statementP "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))), 
+        P.parse statementP "foo = function (x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))]))))
       ]
 
 test :: IO Counts
@@ -228,6 +241,7 @@ prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
 prop_roundtrip_exp :: Expression -> Bool
 prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 
+-- Currently fails 1/3 of the time. 
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 
