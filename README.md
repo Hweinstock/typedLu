@@ -50,19 +50,28 @@ CP1:
 - [x] Add tests for union types with explicit type signatures.
 
 CP2:
-- [ ] Require tables to be type annotated. 
+- [ ] Require tables to be type annotated. (Harry)
+- [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
+- [ ] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
+- [ ] Outline abitrary and shrinkfor well-typed programs.
+- [ ] Add additional quickCheck property for type checker about well-typed programs.
+- [ ] Implement arbitrary and shrink for well-typed programs. 
 - [ ] Implement arbitrary and shrink for `LType`.
 - [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
 - [x] Add more advanced types to the parser (table, functions, unions)
 - [x] Modify evaluator to evaluate functions.
-- [ ] Extend E2E tests to include type checking step. 
+- [ ] Extend E2E tests to include type checking step. (Harry)
 - [ ] Implement `checker`. 
 - [ ] Implement `synthesis`.
 - [ ] Implement `typeCheckBlock` and `typeCheckStatement`.
+
+Final:
 - [ ] Augment parser to accept optional type signatures.
-- [ ] Handle optional type signatures in evaluator and in type checker. 
+- [ ] Handle optional type signatures in evaluator and in type checker.
+
 Potential Extensions:
-- [ ] User Defined types?
+- [ ] Proper lexical scoping for function calls. 
+- [ ] User Defined types.
 - [ ] Allow optional types in tables and functions. 
 - [ ] Other things?
 
