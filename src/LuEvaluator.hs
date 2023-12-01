@@ -18,6 +18,12 @@ type Table = Map Value Value
 globalTableName :: Name
 globalTableName = "_G"
 
+returnValueName :: Name 
+returnValueName = "_R"
+
+terminationFlagName :: Name 
+terminationFlagName = "_T"
+
 initialStore :: Store
 initialStore = Map.singleton globalTableName Map.empty
 
@@ -133,10 +139,11 @@ evalE (Call func pps) = do
       pOrigValues <- seqEval pOrigValuesVars
 
       setVars parameterNames pps -- Initialize variables as values. 
-      result <- evalFunc b 
+      eval b
+      returnValue <- evalE (Var (Name returnValueName))
       setVars parameterNames (map Val pOrigValues) -- Uninitialize variables back to what they were. 
-
-      return result
+      setVars [returnValueName] [Val NilVal]
+      return returnValue
     _ -> return NilVal
 
 -- | Set list of parameters to list of expressions, return resulting state. 
@@ -230,12 +237,6 @@ toBool _ = True
 eval :: Block -> State Store ()
 eval (Block ss) = mapM_ evalS ss
 
-evalFunc :: Block -> State Store Value 
-evalFunc (Block []) = return NilVal
-evalFunc (Block (s : ss)) = case s of 
-  (Return e) -> evalE e 
-  _ -> evalS s >> evalFunc (Block ss)
-
 -- | Statement evaluator
 evalS :: Statement -> State Store ()
 evalS (If e s1 s2) = do
@@ -255,7 +256,7 @@ evalS (Assign v e) = do
     Just ref -> update ref e'
     _ -> return ()
 evalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-evalS (Return e) = return () -- do nothing since we aren't in function. 
+evalS (Return e) = evalS (Assign (Name returnValueName) e)
 evalS Empty = return () -- do nothing
 
 exec :: Block -> Store -> Store

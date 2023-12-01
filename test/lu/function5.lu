@@ -1,0 +1,13 @@
+foo = function(x:boolean) : string 
+    if x then 
+        return "foo" 
+    else 
+        return "not foo" 
+    end
+end 
+z = foo(true)
+if z == "foo" then 
+    x = 1
+else 
+    x = 2 
+end

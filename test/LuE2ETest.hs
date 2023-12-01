@@ -75,9 +75,10 @@ test_function =
         TestList 
            [
              "function1" ~: testFile "test/lu/function1.lu" (checkVarExistsInStore "foo"), 
-             "function2" ~: testFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11), ("x1", NilVal), ("x2", NilVal)]), 
-             "function3" ~: testFile "test/lu/function3.lu" (checkVarValueInStore "z" (IntVal (-1))), 
-             "function4" ~: testFile "test/lu/function4.lu" (checkVarValueInStore "z" (IntVal 5)) 
+             "function2" ~: testFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11), ("x1", NilVal), ("y1", NilVal)]), 
+             "function3" ~: testFile "test/lu/function3.lu" (checkVarValuesInStore [("z", IntVal (-1)), ("s", StringVal "True"), ("x", IntVal 1), ("y", IntVal 2)]), 
+             "function4" ~: testFile "test/lu/function4.lu" (checkVarValueInStore "z" (IntVal 5)), 
+             "function5" ~: testFile "test/lu/function5.lu" (checkVarValuesInStore [("z", StringVal "foo"), ("x", IntVal 1)])
            ]
 
 test :: IO Counts 
