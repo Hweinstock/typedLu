@@ -8,12 +8,6 @@ import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import LuEvaluator (Store)
 
-{-
-===================================================================
-======================= Checker: Unit Tests =======================
-===================================================================
--}
-
 store :: EnvironmentTypes
 store  = 
   Map.fromList
@@ -28,6 +22,12 @@ store  =
       ("function2", FunctionType IntType IntType)
       
     ]
+
+{-
+===================================================================
+======================= Checker: Unit Tests =======================
+===================================================================
+-}
 
 -- Test checker function with Var as input
 test_checkerVar :: Test
@@ -64,4 +64,18 @@ test_checkerVal =
                 checker (Val (FunctionVal [("x", IntType)] StringType (Block []))) (FunctionType IntType StringType) store ~?= True,
                 checker (Val (FunctionVal [("x", StringType)] StringType (Block []))) (FunctionType IntType StringType) store ~?= False,
                 checker (Val (FunctionVal [("x", IntType)] IntType (Block []))) (FunctionType IntType StringType) store ~?= False
+            ]
+
+-- Test checker function with Op1 as input
+test_checkerOp1 :: Test
+test_checkerOp1 =
+    "checker Op1" ~:
+        TestList
+            [ 
+                checker (Op1 Neg (Var (Name "int"))) IntType store ~?= True,
+                checker (Op1 Neg (Var (Name "string"))) IntType store ~?= False,
+                checker (Op1 Not (Var (Name "boolean"))) BooleanType store ~?= True,
+                checker (Op1 Not (Var (Name "int"))) BooleanType store ~?= False,
+                checker (Op1 Len (Var (Name "string"))) IntType store ~?= True,
+                checker (Op1 Len (Var (Name "int"))) IntType store ~?= False
             ]
