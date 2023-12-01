@@ -50,6 +50,7 @@ CP1:
 - [x] Add tests for union types with explicit type signatures.
 
 CP2:
+- [ ] Fix parser to get round-trip propert back (Harry)
 - [ ] Require tables to be type annotated. (Harry)
 - [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [ ] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
@@ -76,8 +77,5 @@ Potential Extensions:
 - [ ] Other things?
 
 ## Questions for Nick 
-- Should the typechecker error or return a boolean? We currently error so that we can provide more useful info.
-- What other quickCheck properties can we add?
-- `prop_roundtrip_stat` fails randomly?
-- Thinking of requiring user to add union type annotation for tables, otherwise we reject. Seem reasonable?
+
 
