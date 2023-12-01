@@ -128,31 +128,35 @@ evalE (Call func pps) = do
   fv <- evalE (Var func) 
   case fv of 
     (FunctionVal ps rt b) -> do 
-      setParameters pps ps
-      evalFunc b
-      -- Need to unset parameters? 
+      let parameterNames = map fst ps
+      let pOrigValuesVars = map (Var . Name) parameterNames
+      pOrigValues <- seqEval pOrigValuesVars
+
+      setVars parameterNames pps -- Initialize variables as values. 
+      result <- evalFunc b 
+      setVars parameterNames (map Val pOrigValues) -- Uninitialize variables back to what they were. 
+
+      return result
     _ -> return NilVal
 
-setParameters :: [Expression] -> [Parameter] -> State Store () 
-setParameters pps ps = do 
-  let valuesStore = foldr seqEval (return []) pps
-  values <- valuesStore
-  let pNames = map fst ps
+-- | Set list of parameters to list of expressions, return resulting state. 
+setVars :: [Name] -> [Expression] -> State Store () 
+setVars pNames pps = do 
+  values <- seqEval pps
   foldr seqSet (return ()) (zip values pNames)
-  --return ()
-
   where 
-    seqEval :: Expression -> State Store [Value] -> State Store [Value]
-    seqEval e s = do 
-      curValues <- s
-      newValue <- evalE e 
-      return (newValue : curValues)
-    
     seqSet :: (Value, Name) -> State Store () -> State Store () 
-    seqSet p@(v, n) s = s >> setParameter p
+    seqSet p@(v, n) s = s >> evalS (Assign (Name n) (Val v))
+    
 
-setParameter :: (Value, Name) -> State Store () 
-setParameter (v, n) = evalS (Assign (Name n) (Val v))
+-- | Evaluate a list of expressions in sequence (passing state along right to left), returning all values in final state monad. 
+seqEval :: [Expression] -> State Store [Value]
+seqEval = foldr seqEvalHelper (return []) where 
+  seqEvalHelper :: Expression -> State Store [Value] -> State Store [Value]
+  seqEvalHelper e s = do 
+    curValues <- s
+    newValue <- evalE e 
+    return (newValue : curValues)
 
 fieldToPair :: TableField -> State Store (Value, Value)
 fieldToPair (FieldName n exp) = do
