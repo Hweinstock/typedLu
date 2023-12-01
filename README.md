@@ -41,10 +41,10 @@ CP1:
 - [x] Define type `datatype`.
 - [x] Create bare-bones `LuTypeChecker` module.
 - [x] Outline arbitrary and shrink for `LType`.
-- [ ] Unit tests for `synthesis`.
-- [ ] quickCheck tests for `synthesis`.
-- [ ] Unit tests for `checker`.
-- [ ] quickCheck tests for `checker`.
+- [x] Unit tests for `synthesis`.
+- [x] quickCheck tests for `synthesis`.
+- [x] Unit tests for `checker`.
+- [x] quickCheck tests for `checker`.
 - [x] Outline function implementation in parser w/ unit tests.
 - [ ] Outline function implementation in evaluator w/ unit tests.
 
