@@ -19,8 +19,8 @@ store  =
       ("table3", TableType BooleanType BooleanType),
       ("function1", FunctionType IntType StringType),
       ("function2", FunctionType StringType StringType),
-      ("function2", FunctionType IntType IntType)
-      
+      ("function3", FunctionType IntType IntType),
+      ("function4", FunctionType IntType (UnionType IntType StringType))
     ]
 
 {-
@@ -46,7 +46,10 @@ test_checkerVar =
                 checker (Var (Name "table3")) (TableType StringType BooleanType) store ~?= False,
                 checker (Var (Name "function1")) (FunctionType IntType StringType) store ~?= True,
                 checker (Var (Name "function2")) (FunctionType IntType StringType) store ~?= False,
-                checker (Var (Name "function3")) (FunctionType IntType StringType) store ~?= False
+                checker (Var (Name "function3")) (FunctionType IntType StringType) store ~?= False,
+                checker (Var (Name "function4")) (FunctionType IntType StringType) store ~?= False,
+                checker (Var (Name "function4")) (FunctionType IntType (UnionType IntType StringType)) store ~?= True,
+                checker (Var (Name "function1")) (FunctionType IntType (UnionType IntType StringType)) store ~?= False
             ]
 
 -- Test checker function with Val as input
@@ -129,10 +132,13 @@ test_checkerCall =
     "checker Call" ~:
         TestList
             [ 
-                checker (Call (Name "int") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= True,
-                checker (Call (Name "string") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
-                checker (Call (Name "int") [Var (Name "String"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
-                checker (Call (Name "int") [Var (Name "int")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False
+                checker (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= True,
+                checker (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
+                checker (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
+                checker (Call (Name "function1") [Var (Name "int")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
+                checker (Call (Name "function4") [Var (Name "int")]) (FunctionType IntType (UnionType IntType StringType)) store ~?= True,
+                checker (Call (Name "function4") [Var (Name "string")]) (FunctionType IntType (UnionType IntType StringType)) store ~?= True,
+                checker (Call (Name "function4") [Var (Name "boolean")]) (FunctionType IntType (UnionType IntType StringType)) store ~?= False
             ]
 
 {-
@@ -148,17 +154,11 @@ test_synthesisVar =
         TestList
             [ 
                 synthesis (Var (Name "int")) store ~?= IntType,
-                synthesis (Var (Name "string")) store ~?= Never,
                 synthesis (Var (Name "string")) store ~?= StringType,
-                synthesis (Var (Name "int")) store ~?= Never,
                 synthesis (Var (Name "boolean")) store ~?= BooleanType,
-                synthesis (Var (Name "int")) store ~?= Never,
                 synthesis (Var (Name "table1")) store ~?= TableType StringType BooleanType,
-                synthesis (Var (Name "table2")) store ~?= Never,
-                synthesis (Var (Name "table3")) store ~?= Never,
                 synthesis (Var (Name "function1")) store ~?= FunctionType IntType StringType,
-                synthesis (Var (Name "function2")) store ~?= Never,
-                synthesis (Var (Name "function3")) store ~?= Never
+                synthesis (Var (Name "function4")) store ~?= FunctionType IntType (UnionType IntType StringType)
             ]
 
 -- Test synthesis function with Val as input
@@ -168,14 +168,9 @@ test_synthesisVal =
         TestList
             [ 
                 synthesis (Val (IntVal 0)) store ~?= IntType,
-                synthesis (Val (StringVal "")) store ~?= Never,
                 synthesis (Val (StringVal "")) store ~?= StringType,
-                synthesis (Val (IntVal 0)) store ~?= Never,
                 synthesis (Val (BoolVal True)) store ~?= BooleanType,
-                synthesis (Val (IntVal 0)) store ~?= Never,
-                synthesis (Val (FunctionVal [("x", IntType)] StringType (Block []))) store ~?= FunctionType IntType StringType,
-                synthesis (Val (FunctionVal [("x", StringType)] StringType (Block []))) store ~?= Never,
-                synthesis (Val (FunctionVal [("x", IntType)] IntType (Block []))) store ~?= Never
+                synthesis (Val (FunctionVal [("x", IntType)] StringType (Block []))) store ~?= FunctionType IntType StringType
             ]
 
 -- Test synthesis function with Op1 as input
@@ -241,10 +236,13 @@ test_synthesisCall =
     "synthesis Call" ~:
         TestList
             [ 
-                synthesis (Call (Name "int") [Var (Name "int"), Var (Name "string")]) store ~?= FunctionType IntType (FunctionType IntType StringType),
-                synthesis (Call (Name "string") [Var (Name "int"), Var (Name "string")]) store ~?= Never,
-                synthesis (Call (Name "int") [Var (Name "String"), Var (Name "string")]) store ~?= Never,
-                synthesis (Call (Name "int") [Var (Name "int")]) store ~?= Never
+                synthesis (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) store ~?= FunctionType IntType (FunctionType IntType StringType),
+                synthesis (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) store ~?= Never,
+                synthesis (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) store ~?= Never,
+                synthesis (Call (Name "function1") [Var (Name "int")]) store ~?= Never,
+                synthesis (Call (Name "function4") [Var (Name "int")]) store ~?= FunctionType IntType (UnionType IntType StringType),
+                synthesis (Call (Name "function4") [Var (Name "string")]) store ~?= FunctionType IntType (UnionType IntType StringType),
+                synthesis (Call (Name "function4") [Var (Name "boolean")]) store ~?= Never
             ]
 
 {-
