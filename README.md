@@ -40,11 +40,11 @@ use a library that is not on stackage, you'll need to update the common-stanza
 CP1:
 - [x] Define type `datatype`.
 - [x] Create bare-bones `LuTypeChecker` module.
-- [ ] Outline arbitrary and shrink for `LType`.
-- [ ] Unit tests for `synthesis`.
-- [ ] quickCheck tests for `synthesis`.
-- [ ] Unit tests for `checker`.
-- [ ] quickCheck tests for `checker`.
+- [x] Outline arbitrary and shrink for `LType`.
+- [x] Unit tests for `synthesis`.
+- [x] quickCheck tests for `synthesis`.
+- [x] Unit tests for `checker`.
+- [x] quickCheck tests for `checker`.
 - [x] Outline function implementation in parser w/ unit tests.
 - [x] Outline function implementation in evaluator w/ unit tests.
 

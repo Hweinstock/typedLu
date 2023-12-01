@@ -37,7 +37,7 @@ checkVarValuesInStore valuePairs s = let results = map (\(n, v) -> checkVarValue
         didFail :: Either String Bool -> Bool
         didFail (Right True) = True 
         didFail _ = False
-
+        
 -- | Check if variable holds value in store. 
 checkVarExistsInStore :: String -> Store -> Either String Bool 
 checkVarExistsInStore targetName = checkVarProperty targetName (const True)
