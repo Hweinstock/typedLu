@@ -122,3 +122,15 @@ test_checkerTableConst =
                 checker (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) (TableType StringType IntType) store ~?= False,
                 checker (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) (TableType StringType IntType) store ~?= False
             ]
+
+-- Test checker function with Call as input
+test_checkerCall :: Test
+test_checkerCall =
+    "checker Call" ~:
+        TestList
+            [ 
+                checker (Call (Name "int") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= True,
+                checker (Call (Name "string") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
+                checker (Call (Name "int") [Var (Name "String"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
+                checker (Call (Name "int") [Var (Name "int")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False
+            ]
