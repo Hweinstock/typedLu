@@ -68,5 +68,7 @@ Potential Extensions:
 
 ## Questions for Nick 
 - Should the typechecker error or return a boolean? We currently error so that we can provide more useful info.
+- What other quickCheck properties can we add?
+- `prop_roundtrip_stat` fails randomly?
 - Thinking of requiring user to add union type annotation for tables, otherwise we reject. Seem reasonable?
 
