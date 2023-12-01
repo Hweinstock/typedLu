@@ -43,7 +43,7 @@ CP1:
 - [x] Outline arbitrary and shrink for `LType`.
 - [ ] Unit tests for `synthesis`.
 - [ ] quickCheck tests for `synthesis`.
-- [ ] Unit tests for `checker`.
+- [x] Unit tests for `checker`.
 - [ ] quickCheck tests for `checker`.
 - [x] Outline function implementation in parser w/ unit tests.
 - [ ] Outline function implementation in evaluator w/ unit tests.

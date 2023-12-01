@@ -134,3 +134,115 @@ test_checkerCall =
                 checker (Call (Name "int") [Var (Name "String"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False,
                 checker (Call (Name "int") [Var (Name "int")]) (FunctionType IntType (FunctionType IntType StringType)) store ~?= False
             ]
+
+{-
+===================================================================
+====================== Synthesis: Unit Tests ======================
+===================================================================
+-}
+
+-- Test synthesis function with Var as input
+test_synthesisVar :: Test
+test_synthesisVar =
+    "synthesis Var" ~:
+        TestList
+            [ 
+                synthesis (Var (Name "int")) store ~?= IntType,
+                synthesis (Var (Name "string")) store ~?= Never,
+                synthesis (Var (Name "string")) store ~?= StringType,
+                synthesis (Var (Name "int")) store ~?= Never,
+                synthesis (Var (Name "boolean")) store ~?= BooleanType,
+                synthesis (Var (Name "int")) store ~?= Never,
+                synthesis (Var (Name "table1")) store ~?= TableType StringType BooleanType,
+                synthesis (Var (Name "table2")) store ~?= Never,
+                synthesis (Var (Name "table3")) store ~?= Never,
+                synthesis (Var (Name "function1")) store ~?= FunctionType IntType StringType,
+                synthesis (Var (Name "function2")) store ~?= Never,
+                synthesis (Var (Name "function3")) store ~?= Never
+            ]
+
+-- Test synthesis function with Val as input
+test_synthesisVal :: Test
+test_synthesisVal =
+    "synthesis Val" ~:
+        TestList
+            [ 
+                synthesis (Val (IntVal 0)) store ~?= IntType,
+                synthesis (Val (StringVal "")) store ~?= Never,
+                synthesis (Val (StringVal "")) store ~?= StringType,
+                synthesis (Val (IntVal 0)) store ~?= Never,
+                synthesis (Val (BoolVal True)) store ~?= BooleanType,
+                synthesis (Val (IntVal 0)) store ~?= Never,
+                synthesis (Val (FunctionVal [("x", IntType)] StringType (Block []))) store ~?= FunctionType IntType StringType,
+                synthesis (Val (FunctionVal [("x", StringType)] StringType (Block []))) store ~?= Never,
+                synthesis (Val (FunctionVal [("x", IntType)] IntType (Block []))) store ~?= Never
+            ]
+
+-- Test synthesis function with Op1 as input
+test_synthesisOp1 :: Test
+test_synthesisOp1 =
+    "synthesis Op1" ~:
+        TestList
+            [ 
+                synthesis (Op1 Neg (Var (Name "int"))) store ~?= IntType,
+                synthesis (Op1 Neg (Var (Name "string"))) store ~?= Never,
+                synthesis (Op1 Not (Var (Name "boolean"))) store ~?= BooleanType,
+                synthesis (Op1 Not (Var (Name "int"))) store ~?= Never,
+                synthesis (Op1 Len (Var (Name "string"))) store ~?= IntType,
+                synthesis (Op1 Len (Var (Name "int"))) store ~?= Never
+            ]
+
+-- Test synthesis function with Op2 as input
+test_synthesisOp2 :: Test
+test_synthesisOp2 =
+    "synthesis Op2" ~:
+        TestList
+            [ 
+                synthesis (Op2 (Var (Name "int")) Plus (Var (Name "int"))) store ~?= IntType,
+                synthesis (Op2 (Var (Name "string")) Plus (Var (Name "int"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "int")) Minus (Var (Name "int"))) store ~?= IntType,
+                synthesis (Op2 (Var (Name "boolean")) Minus (Var (Name "int"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "int")) Times (Var (Name "int"))) store ~?= IntType,
+                synthesis (Op2 (Var (Name "string")) Times (Var (Name "int"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "int")) Divide (Var (Name "int"))) store ~?= IntType,
+                synthesis (Op2 (Var (Name "boolean")) Divide (Var (Name "int"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "int")) Modulo (Var (Name "int"))) store ~?= IntType,
+                synthesis (Op2 (Var (Name "string")) Modulo (Var (Name "int"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "int")) Eq (Var (Name "int"))) store ~?= BooleanType,
+                synthesis (Op2 (Var (Name "int")) Eq (Var (Name "string"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "string")) Gt (Var (Name "string"))) store ~?= BooleanType,
+                synthesis (Op2 (Var (Name "string")) Gt (Var (Name "boolean"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "boolean")) Ge (Var (Name "boolean"))) store ~?= BooleanType,
+                synthesis (Op2 (Var (Name "boolean")) Ge (Var (Name "int"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "string")) Lt (Var (Name "string"))) store ~?= BooleanType,
+                synthesis (Op2 (Var (Name "string")) Lt (Var (Name "int"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "boolean")) Le (Var (Name "boolean"))) store ~?= BooleanType,
+                synthesis (Op2 (Var (Name "boolean")) Le (Var (Name "string"))) store ~?= Never,
+                synthesis (Op2 (Var (Name "string")) Concat (Var (Name "string"))) store ~?= StringType,
+                synthesis (Op2 (Var (Name "string")) Concat (Var (Name "int"))) store ~?= Never
+            ]
+
+-- Test synthesis function with TableConst as input
+test_synthesisTableConst :: Test
+test_synthesisTableConst =
+    "synthesis TableConst" ~:
+        TestList
+            [ 
+                synthesis (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "int"))]) store ~?= TableType StringType IntType,
+                synthesis (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) store ~?= Never,
+                synthesis (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) store ~?= TableType StringType IntType,
+                synthesis (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) store ~?= Never,
+                synthesis (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) store ~?= Never
+            ]
+
+-- Test synthesis function with Call as input
+test_synthesisCall :: Test
+test_synthesisCall =
+    "synthesis Call" ~:
+        TestList
+            [ 
+                synthesis (Call (Name "int") [Var (Name "int"), Var (Name "string")]) store ~?= FunctionType IntType (FunctionType IntType StringType),
+                synthesis (Call (Name "string") [Var (Name "int"), Var (Name "string")]) store ~?= Never,
+                synthesis (Call (Name "int") [Var (Name "String"), Var (Name "string")]) store ~?= Never,
+                synthesis (Call (Name "int") [Var (Name "int")]) store ~?= Never
+            ]
