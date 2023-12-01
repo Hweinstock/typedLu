@@ -1,0 +1,8 @@
+x = 5
+y = 6 
+foo = function(x1: int, y1: int): int 
+    return x1 + y1 
+end 
+z = foo(x, y)
+
+

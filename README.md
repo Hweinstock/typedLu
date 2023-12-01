@@ -46,16 +46,18 @@ CP1:
 - [x] Unit tests for `checker`.
 - [x] quickCheck tests for `checker`.
 - [x] Outline function implementation in parser w/ unit tests.
-- [ ] Outline function implementation in evaluator w/ unit tests.
+- [x] Outline function implementation in evaluator w/ unit tests.
 
 CP2:
 - [ ] Implement arbitrary and shrink for `LType`.
 - [ ] Modify parser to parse functions.
 - [ ] Modify evaluator to evaluate functions.
+- [ ] Extend E2E tests to include type checking step. 
 - [ ] Implement `checker`. 
 - [ ] Implement `synthesis`.
 - [ ] Augment parser to accept optional type signatures.
 - [ ] Add tests for union types with explicit type signatures.
+Potential Extensions:
 - [ ] Other things?
 - [ ] User Defined types?
 

@@ -76,6 +76,7 @@ test-suite project-cis5520-test
       LuParserTest
       LuEvaluatorTest
       LuStepperTest
+      LuE2ETest
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
