@@ -9,29 +9,6 @@ import LuTypes
 isValueType :: LType -> Bool 
 isValueType = undefined
 
-{- TODO: Formalize this into test. (want to reject)
-x = "here "
-
-x = 5 
--}
-
-{- TODO: Formalize this into test. (want to reject)
-k = "x"
-a[k] = 10      
-a[20] = "great"
--}
-
-{-TODO: test for union types with table of two different keys. 
-
--}
-
-{-quickCheck tests 
-- synthesis(evaluated statement) == synthesis(original statement)
-- checker(synthesis(statement), statement) == True 
-- 
-
--}
-
 type EnvironmentTypes = Map Name LType
 type EnvironmentState = State EnvironmentTypes ()
 

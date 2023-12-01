@@ -246,3 +246,17 @@ test_synthesisCall =
                 synthesis (Call (Name "int") [Var (Name "String"), Var (Name "string")]) store ~?= Never,
                 synthesis (Call (Name "int") [Var (Name "int")]) store ~?= Never
             ]
+
+{-
+===================================================================
+================== TypeChecker: QuickCheck Tests ==================
+===================================================================
+-}
+
+-- Quickcheck property for checker function
+prop_checker :: Expression -> LType -> Bool
+prop_checker e t = checker e t store == (synthesis e store == t)
+
+-- Quickcheck property for synthesis function
+prop_synthesis :: Expression -> Bool
+prop_synthesis e = checker e (synthesis e store) store
