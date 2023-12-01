@@ -18,6 +18,26 @@ type Table = Map Value Value
 globalTableName :: Name
 globalTableName = "_G"
 
+returnValueName :: Name 
+returnValueName = "_R"
+
+returnValueRef :: Reference
+returnValueRef = (globalTableName, StringVal returnValueName)
+
+returnFlagName :: Name 
+returnFlagName = "_F"
+
+returnFlagRef :: Reference
+returnFlagRef = (globalTableName, StringVal returnFlagName)
+
+isReturnFlagSet :: State Store Bool 
+isReturnFlagSet = do 
+  currentState <- S.get
+  value <- evalE (Var (Name returnFlagName))
+  return $ case value of 
+    (BoolVal True) -> True 
+    _ -> False
+
 initialStore :: Store
 initialStore = Map.singleton globalTableName Map.empty
 
@@ -124,7 +144,45 @@ evalE (Op1 o e) = do
   e' <- evalE e
   evalOp1 o e'
 evalE (TableConst _fs) = evalTableConst _fs
-evalE (Call fv ps) = undefined
+evalE (Call func pps) = do 
+  fv <- evalE (Var func) 
+  case fv of 
+    (FunctionVal ps rt b) -> do 
+      let parameterNames = map fst ps
+      let pOrigValuesVars = map (Var . Name) parameterNames
+      pOrigValues <- seqEval pOrigValuesVars
+
+      -- Initialize parameters as values. 
+      setVars parameterNames pps 
+      eval b
+      returnValue <- evalE (Var (Name returnValueName))
+      -- Reset Flags/ReturnValue
+      update returnValueRef NilVal 
+      update returnFlagRef (BoolVal False)
+
+      -- Unscope Parameters i.e. NilValue them. 
+      setVars parameterNames (map Val pOrigValues)
+      return returnValue
+    _ -> return NilVal
+
+-- | Set list of parameters to list of expressions, return resulting state. 
+setVars :: [Name] -> [Expression] -> State Store () 
+setVars pNames pps = do 
+  values <- seqEval pps
+  foldr seqSet (return ()) (zip values pNames)
+  where 
+    seqSet :: (Value, Name) -> State Store () -> State Store () 
+    seqSet p@(v, n) s = s >> evalS (Assign (Name n) (Val v))
+    
+
+-- | Evaluate a list of expressions in sequence (passing state along right to left), returning all values in final state monad. 
+seqEval :: [Expression] -> State Store [Value]
+seqEval = foldr seqEvalHelper (return []) where 
+  seqEvalHelper :: Expression -> State Store [Value] -> State Store [Value]
+  seqEvalHelper e s = do 
+    curValues <- s
+    newValue <- evalE e 
+    return (newValue : curValues)
 
 fieldToPair :: TableField -> State Store (Value, Value)
 fieldToPair (FieldName n exp) = do
@@ -200,25 +258,28 @@ eval (Block ss) = mapM_ evalS ss
 
 -- | Statement evaluator
 evalS :: Statement -> State Store ()
-evalS (If e s1 s2) = do
-  v <- evalE e
-  if toBool v then eval s1 else eval s2
-evalS w@(While e ss) = do
-  v <- evalE e
-  when (toBool v) $ do
-    eval ss
-    evalS w
-evalS (Assign v e) = do
-  -- update global variable or table field v to value of e
-  s <- S.get
-  mRef <- resolveVar v
-  e' <- evalE e
-  case mRef of
-    Just ref -> update ref e'
-    _ -> return ()
-evalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-evalS (Return e) = undefined
-evalS Empty = return () -- do nothing
+evalS s = do 
+  didReturn <- isReturnFlagSet 
+  if didReturn then return () else doEvalS s where 
+    doEvalS (If e s1 s2) = do
+      v <- evalE e
+      if toBool v then eval s1 else eval s2
+    doEvalS w@(While e ss) = do
+      v <- evalE e
+      when (toBool v) $ do
+        eval ss
+        evalS w
+    doEvalS (Assign v e) = do
+      -- update global variable or table field v to value of e
+      s <- S.get
+      mRef <- resolveVar v
+      e' <- evalE e
+      case mRef of
+        Just ref -> update ref e'
+        _ -> return ()
+    doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
+    doEvalS (Return e) = evalS (Assign (Name returnValueName) e) >> evalS (Assign (Name returnFlagName) (Val (BoolVal True)))
+    doEvalS Empty = return () -- do nothing
 
 exec :: Block -> Store -> Store
 exec = S.execState . eval

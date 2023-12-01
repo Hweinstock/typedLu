@@ -1,0 +1,5 @@
+foo = function (x : int | string) : nil 
+    y = 1
+    z = x + y 
+    ;
+end

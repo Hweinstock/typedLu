@@ -1,0 +1,11 @@
+function foo1(x: int, y: int) : int 
+    z = x + y 
+    function foo2(w : int) : int 
+        return w + z
+    end 
+
+    return foo2(z)
+end 
+
+result = foo1(5, 4)
+result2 = foo2(3)

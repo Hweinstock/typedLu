@@ -1,0 +1,6 @@
+b = 10 
+function foo(b : int) : int 
+    return b + 5
+end 
+
+z = foo(3)

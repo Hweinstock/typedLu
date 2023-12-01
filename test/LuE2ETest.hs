@@ -29,6 +29,15 @@ checkVarProperty targetName property s = case Map.lookup globalTableName s of
 checkVarValueInStore :: String -> Value -> Store -> Either String Bool 
 checkVarValueInStore targetName targetValue = checkVarProperty targetName (== targetValue)
 
+-- | Concise way to check multiple variable values.
+checkVarValuesInStore :: [(String, Value)] -> Store -> Either String Bool 
+checkVarValuesInStore valuePairs s = let results = map (\(n, v) -> checkVarValueInStore n v s) valuePairs in 
+    return $ all didFail results 
+    where 
+        didFail :: Either String Bool -> Bool
+        didFail (Right True) = True 
+        didFail _ = False
+        
 -- | Check if variable holds value in store. 
 checkVarExistsInStore :: String -> Store -> Either String Bool 
 checkVarExistsInStore targetName = checkVarProperty targetName (const True)
@@ -66,8 +75,15 @@ test_function =
         TestList 
            [
              "function1" ~: testFile "test/lu/function1.lu" (checkVarExistsInStore "foo"), 
-             "function2" ~: testFile "test/lu/function2.lu" (checkVarValueInStore "z" (IntVal 11)), 
-             "function3" ~: testFile "test/lu/function3.lu" (checkVarValueInStore "z" (IntVal (-1))) 
+             "function2" ~: testFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11), ("x1", NilVal), ("y1", NilVal)]), 
+             "function3" ~: testFile "test/lu/function3.lu" (checkVarValuesInStore [("z", IntVal (-1)), ("s", StringVal "True"), ("x", IntVal 1), ("y", IntVal 2)]), 
+             "function4" ~: testFile "test/lu/function4.lu" (checkVarValueInStore "z" (IntVal 5)), 
+             "function5" ~: testFile "test/lu/function5.lu" (checkVarValuesInStore [("z", StringVal "foo"), ("x", IntVal 1)]), 
+             "function6" ~: testFile "test/lu/function6.lu" (checkVarValuesInStore [("f", BoolVal False), ("z", IntVal 1)]), 
+             "recFunction" ~: testFile "test/lu/recFunction.lu" (checkVarValueInStore "z" (IntVal 720)), 
+             "weirdScopesFunc" ~: testFile "test/lu/weirdScopesFunc.lu" (checkVarValuesInStore [("result", IntVal 18), ("result2", IntVal 12)]), 
+             "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"), 
+             "function7" ~: testFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)])
            ]
 
 test :: IO Counts 
