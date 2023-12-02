@@ -226,16 +226,16 @@ tExecTable =
           ("_t1", Map.fromList [(IntVal 20, StringVal "great"), (StringVal "x", IntVal 11)])
         ]
 
--- tExecBfs :: Test
--- tExecBfs = "exec wBfs" ~: TestList [global !? StringVal "found" ~?= Just (BoolVal True)]
---   where
---     ss = exec wBfs initialStore
---     global = case ss !? globalTableName of
---       Just g -> g
---       Nothing -> Map.empty
+tExecBfs :: Test
+tExecBfs = "exec wBfs" ~: TestList [global !? StringVal "found" ~?= Just (BoolVal True)]
+  where
+    ss = exec wBfs initialStore
+    global = case ss !? globalTableName of
+      Just g -> g
+      Nothing -> Map.empty
 
 test :: IO Counts
-test = runTestTT $ TestList [test_index, test_update, test_resolveVar, test_evaluateNot, test_evaluateLen, test_tableConst, test_evalOp2, tExecTest, tExecFact, tExecAbs, tExecTimes, tExecTable]-- tExecBfs]
+test = runTestTT $ TestList [test_index, test_update, test_resolveVar, test_evaluateNot, test_evaluateLen, test_tableConst, test_evalOp2, tExecTest, tExecFact, tExecAbs, tExecTimes, tExecTable, tExecBfs]
 
 prop_evalE_total :: Expression -> Store -> Bool
 prop_evalE_total e s = case evaluate e s of

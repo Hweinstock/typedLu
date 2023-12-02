@@ -200,9 +200,9 @@ statement2P :: Parser Statement
 statement2P = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
   where
     assignP :: Parser Statement
-    assignP = AssignT <$> typedVarP <*> (stringP "=" *> expP)
+    assignP = Assign <$> typedVarP <*> (stringP "=" *> expP)
     functionAssignP :: Parser Statement 
-    functionAssignP = liftA2 AssignT functionHeaderP (Val <$> unnamedFunctionP) where 
+    functionAssignP = liftA2 Assign functionHeaderP (Val <$> unnamedFunctionP) where 
       unnamedFunctionP :: Parser Value
       unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
       functionHeaderP :: Parser TypedVar

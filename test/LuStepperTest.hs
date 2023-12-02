@@ -70,20 +70,20 @@ tExecStepTable =
 
 -- | bfs.lu: calculate breadth-first search of a graph represented by adjacency lists.
 -- Search for a path from node 1 to node 10
--- tExecStepBfs :: Test
--- tExecStepBfs =
---   "execStep wBfs" ~:
---     TestList
---       [ global !? StringVal "found" ~?= Just (BoolVal True)
---       ]
---   where
---     ss = execStep wBfs initialStore
---     global = case ss !? globalTableName of
---       Just g -> g
---       Nothing -> Map.empty
+tExecStepBfs :: Test
+tExecStepBfs =
+  "execStep wBfs" ~:
+    TestList
+      [ global !? StringVal "found" ~?= Just (BoolVal True)
+      ]
+  where
+    ss = execStep wBfs initialStore
+    global = case ss !? globalTableName of
+      Just g -> g
+      Nothing -> Map.empty
 
 test :: IO Counts
-test = runTestTT $ TestList [tExecStepFact, tExecStepAbs, tExecStepTimes, tExecStepAbs, tExecStepTable]-- tExecStepBfs]
+test = runTestTT $ TestList [tExecStepFact, tExecStepAbs, tExecStepTimes, tExecStepAbs, tExecStepTable, tExecStepBfs]
 
 prop_stepExec :: Block -> QC.Property
 prop_stepExec b =
