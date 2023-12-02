@@ -28,9 +28,10 @@ data Statement
   | Empty -- ';'
   | Repeat Block Expression -- repeat s until e
   | Return Expression -- return e
-  | AssignT (Var, LType) Expression --testing
+  | AssignT TypedVar Expression --testing
   deriving (Eq, Show)
 
+type TypedVar = (Var, LType)
 type TypedExpression = (Expression, LType)
 
 data Expression
@@ -106,8 +107,8 @@ instance Ord Value where
 wTest :: Block
 wTest =
   Block
-    [ Assign
-        (Name "x")
+    [ AssignT
+        (Name "x", UnknownType)
         ( Op2
             ( Op2
                 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2)))
@@ -117,12 +118,12 @@ wTest =
             Plus
             (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3)))
         ),
-      Assign (Name "y") (Val (IntVal 0)),
+      AssignT (Name "y", UnknownType) (Val (IntVal 0)),
       While
         (Op2 (var "x") Gt (Val (IntVal 0)))
         ( Block
-            [ Assign (Name "y") (Op2 (var "y") Plus (var "x")),
-              Assign (Name "x") (Op2 (var "x") Minus (Val (IntVal 1)))
+            [ AssignT (Name "y", UnknownType) (Op2 (var "y") Plus (var "x")),
+              AssignT (Name "x", UnknownType) (Op2 (var "x") Minus (Val (IntVal 1)))
             ]
         )
     ]
@@ -131,21 +132,21 @@ wTest =
 wFact :: Block
 wFact =
   Block
-    [ Assign (Name "n") (Val (IntVal 5)),
-      Assign (Name "f") (Val (IntVal 1)),
+    [ AssignT (Name "n", UnknownType) (Val (IntVal 5)),
+      AssignT (Name "f", UnknownType) (Val (IntVal 1)),
       While
         (Op2 (var "n") Gt (Val (IntVal 0)))
         ( Block
-            [ Assign (Name "x") (Var (Name "n")),
-              Assign (Name "z") (Var (Name "f")),
+            [ AssignT (Name "x", UnknownType) (Var (Name "n")),
+              AssignT (Name "z", UnknownType) (Var (Name "f")),
               While
                 (Op2 (var "x") Gt (Val (IntVal 1)))
                 ( Block
-                    [ Assign (Name "f") (Op2 (var "z") Plus (Var (Name "f"))),
-                      Assign (Name "x") (Op2 (var "x") Minus (Val (IntVal 1)))
+                    [ AssignT (Name "f", UnknownType) (Op2 (var "z") Plus (Var (Name "f"))),
+                      AssignT (Name "x", UnknownType) (Op2 (var "x") Minus (Val (IntVal 1)))
                     ]
                 ),
-              Assign (Name "n") (Op2 (Var (Name "n")) Minus (Val (IntVal 1)))
+              AssignT (Name "n", UnknownType) (Op2 (Var (Name "n")) Minus (Val (IntVal 1)))
             ]
         )
     ]

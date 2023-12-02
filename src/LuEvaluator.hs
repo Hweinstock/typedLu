@@ -6,6 +6,7 @@ import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import LuParser qualified
 import LuSyntax
+import LuTypes
 import State (State)
 import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
@@ -172,7 +173,7 @@ setVars pNames pps = do
   foldr seqSet (return ()) (zip values pNames)
   where 
     seqSet :: (Value, Name) -> State Store () -> State Store () 
-    seqSet p@(v, n) s = s >> evalS (Assign (Name n) (Val v))
+    seqSet p@(v, n) s = s >> evalS (AssignT (Name n, UnknownType) (Val v))
     
 
 -- | Evaluate a list of expressions in sequence (passing state along right to left), returning all values in final state monad. 
@@ -277,8 +278,16 @@ evalS s = do
       case mRef of
         Just ref -> update ref e'
         _ -> return ()
+    doEvalS (AssignT (v, _) e) = do
+      -- update global variable or table field v to value of e
+      s <- S.get
+      mRef <- resolveVar v
+      e' <- evalE e
+      case mRef of
+        Just ref -> update ref e'
+        _ -> return ()
     doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-    doEvalS (Return e) = evalS (Assign (Name returnValueName) e) >> evalS (Assign (Name returnFlagName) (Val (BoolVal True)))
+    doEvalS (Return e) = evalS (AssignT (Name returnValueName, UnknownType) e) >> evalS (AssignT (Name returnFlagName, BooleanType) (Val (BoolVal True)))
     doEvalS Empty = return () -- do nothing
 
 exec :: Block -> Store -> Store
