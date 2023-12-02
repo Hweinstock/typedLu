@@ -1,6 +1,7 @@
 module LuSyntax where
 
 import Control.Monad (mapM_)
+import Control.Applicative (liftA2)
 import qualified Data.Char as Char
 import Data.Map (Map)
 import LuTypes
@@ -220,7 +221,18 @@ instance PP Int where
   pp = PP.int
 
 instance PP TypedVar where 
-  pp = undefined
+  pp (v, t) = pp v <> PP.char ':' <> pp t
+
+instance PP LType where 
+  pp Never = PP.text "never"
+  pp UnknownType = PP.text "unknown"
+  pp NilType = PP.text "nil"
+  pp IntType = PP.text "int"
+  pp StringType = PP.text "string"
+  pp BooleanType = PP.text "boolean"
+  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ',' <> pp t2)
+  pp (UnionType t1 t2) = pp t1 <> PP.char '|' <> pp t2 
+  pp (FunctionType t1 t2) = pp t1 <> PP.text "->" <> pp t2
 
 instance PP Var where
   pp (Name n) = PP.text n
@@ -357,7 +369,7 @@ genVar n =
     n' = n `div` 2
 
 genTypedVar :: Int -> Gen TypedVar
-genTypedVar = undefined
+genTypedVar n = liftA2 (,) (genVar n) arbitrary
 
 -- | Generate a size-controlled expression
 genExp :: Int -> Gen Expression
