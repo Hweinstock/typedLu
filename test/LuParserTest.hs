@@ -211,6 +211,18 @@ test_exp =
         P.parse tableConstP "{ x = 2, [3] = false }"
           ~?= Right (TableConst [FieldName "x" (Val (IntVal 2)), FieldKey (Val (IntVal 3)) (Val (BoolVal False))])
       ]
+  
+test_typedExp :: Test 
+test_typedExp = 
+  "parsing typed expressions" ~: 
+    TestList 
+      [ P.parse typedExpP "5 : int" ~?= Right (Val (IntVal 5), IntType), 
+        P.parse typedExpP "3 + 1 : int" ~?= Right (Op2 (Val (IntVal 3)) Plus (Val (IntVal 1)), IntType), 
+        P.parse typedExpP "x : int" ~?= Right (Var (Name "x"), IntType), 
+        P.parse typedExpP "y : string | int" ~?= Right (Var (Name "y"), UnionType StringType IntType), 
+        P.parse typedExpP "f : int -> int" ~?= Right (Var (Name "f"), FunctionType IntType IntType)
+      ]
+
 -- NEW TESTS
 test_stat :: Test
 test_stat =
@@ -233,7 +245,7 @@ test_stat =
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat]
+test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp]
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v

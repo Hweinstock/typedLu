@@ -74,7 +74,9 @@ expP = compP
         <|> Var <$> varP
         <|> parens expP
         <|> Val <$> valueP
-        
+
+typedExpP :: Parser TypedExpression 
+typedExpP = liftA2 (,) expP (afterP ":" lTypeP)
 
 -- | Parse an operator at a specified precedence level
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)

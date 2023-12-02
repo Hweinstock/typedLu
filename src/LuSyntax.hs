@@ -30,6 +30,8 @@ data Statement
   | Return Expression -- return e
   deriving (Eq, Show)
 
+type TypedExpression = (Expression, LType)
+
 data Expression
   = Var Var -- global variables x and table indexing
   | Val Value -- literal values
