@@ -195,9 +195,8 @@ tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
         fieldKeyP :: Parser TableField
         fieldKeyP = liftA2 FieldKey (brackets expP) (afterP "=" expP)
 
--- Temporary function
-statement2P :: Parser Statement 
-statement2P = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
+statementP :: Parser Statement 
+statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
   where
     assignP :: Parser Statement
     assignP = Assign <$> typedVarP <*> (stringP "=" *> expP)
@@ -217,13 +216,13 @@ statement2P = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|>
     repeatP = liftA2 Repeat (afterP "repeat" blockP) (afterP "until" expP)
 
 blockP :: Parser Block
-blockP = Block <$> many statement2P
+blockP = Block <$> many statementP
 
 parseLuExp :: String -> Either P.ParseError Expression
 parseLuExp = P.parse expP
 
 parseLuStat :: String -> Either P.ParseError Statement
-parseLuStat = P.parse statement2P
+parseLuStat = P.parse statementP
 
 parseLuFile :: String -> IO (Either P.ParseError Block)
 parseLuFile = P.parseFromFile (const <$> blockP <*> P.eof)
