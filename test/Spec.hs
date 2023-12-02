@@ -16,8 +16,8 @@ main = do
     LE.test 
     LE.qc
     putStrLn "\n*** Testing LuStepper ***"
-    --LS.test 
-    --LS.qc
+    LS.test 
+    LS.qc
     putStrLn "Skipped due to infinite loop. (fix this)"
     putStrLn "\n*** Testing LuE2ETest ***"
     LE2E.test
