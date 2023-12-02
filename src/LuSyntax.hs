@@ -23,7 +23,7 @@ instance Monoid Block where
   mempty = Block []
 
 data Statement
-  = Assign TypedVar Expression -- x = e
+  = Assign TypedVar Expression -- x = e or x: type = e
   | If Expression Block Block -- if e then s1 else s2 end
   | While Expression Block -- while e do s end
   | Empty -- ';'
