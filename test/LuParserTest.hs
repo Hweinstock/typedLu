@@ -235,22 +235,22 @@ test_stat :: Test
 test_stat = 
   "parsing statements2" ~: 
     TestList 
-      [ P.parse statement2P "x : int = 3" ~?= Right (Assign (Name "x", IntType) (Val (IntVal 3))), 
-        P.parse statement2P "x = 3" ~?= Right (Assign (Name "x", UnknownType) (Val (IntVal 3))), 
-        P.parse statement2P "y = function (y : string): string return y end" ~?= Right (Assign (Name "y", UnknownType) (Val (FunctionVal [("y", StringType)] StringType (Block [Return (Var (Name "y"))])))), 
-        P.parse statement2P ";" ~?= Right Empty,
-        P.parse statement2P "if x then y=nil else end"
+      [ P.parse statementP "x : int = 3" ~?= Right (Assign (Name "x", IntType) (Val (IntVal 3))), 
+        P.parse statementP "x = 3" ~?= Right (Assign (Name "x", UnknownType) (Val (IntVal 3))), 
+        P.parse statementP "y = function (y : string): string return y end" ~?= Right (Assign (Name "y", UnknownType) (Val (FunctionVal [("y", StringType)] StringType (Block [Return (Var (Name "y"))])))), 
+        P.parse statementP ";" ~?= Right Empty,
+        P.parse statementP "if x then y=nil else end"
           ~?= Right (If (Var (Name "x")) (Block [Assign (Name "y", UnknownType) (Val NilVal)]) (Block [])),
-        P.parse statement2P "while nil do end"
+        P.parse statementP "while nil do end"
           ~?= Right (While (Val NilVal) (Block [])),
-        P.parse statement2P "repeat ; ; until false"
+        P.parse statementP "repeat ; ; until false"
           ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False))), 
-        P.parse statement2P "function foo(x: int): int return x + 5 end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))), 
-        P.parse statement2P "foo = function (x: int): int return x + 5 end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))),
-        P.parse statement2P "function foo(): nil ; end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [] NilType (Block [Empty])))), 
-        P.parse statement2P "foo = function (): nil ; end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [] NilType (Block [Empty])))),
-        P.parse statement2P "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))), 
-        P.parse statement2P "foo = function (x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) 
+        P.parse statementP "function foo(x: int): int return x + 5 end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))), 
+        P.parse statementP "foo = function (x: int): int return x + 5 end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))),
+        P.parse statementP "function foo(): nil ; end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [] NilType (Block [Empty])))), 
+        P.parse statementP "foo = function (): nil ; end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [] NilType (Block [Empty])))),
+        P.parse statementP "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))), 
+        P.parse statementP "foo = function (x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) 
       ]
 test :: IO Counts
 test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp, test_typedVarP]
@@ -263,7 +263,7 @@ prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 
 -- Currently fails 1/3 of the time. 
 prop_roundtrip_stat :: Statement -> Bool
-prop_roundtrip_stat s = P.parse statement2P (pretty s) == Right s
+prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 
 qc :: IO ()
 qc = do

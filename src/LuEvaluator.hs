@@ -270,14 +270,6 @@ evalS s = do
       when (toBool v) $ do
         eval ss
         evalS w
-    -- doEvalS (Assign v e) = do
-    --   -- update global variable or table field v to value of e
-    --   s <- S.get
-    --   mRef <- resolveVar v
-    --   e' <- evalE e
-    --   case mRef of
-    --     Just ref -> update ref e'
-    --     _ -> return ()
     doEvalS (Assign (v, _) e) = do
       -- update global variable or table field v to value of e
       s <- S.get
