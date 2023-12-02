@@ -50,10 +50,10 @@ CP1:
 - [x] Add tests for union types with explicit type signatures.
 
 CP2:
-- [ ] Augment parser to accept optional type signatures (Harry).
-- [ ] Change evaluator to ignore type signatures. (Harry)
+- [x] Augment parser to accept optional type signatures (Harry).
+- [x] Change evaluator to ignore type signatures. (Harry)
 - [ ] Fix parser to get round-trip propert back (Harry)
-- [ ] Require tables to be type annotated in type checker. 
+- [ ] Require tables to be type annotated in type checker? 
 - [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [ ] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
 - [ ] Outline abitrary and shrinkfor well-typed programs.
