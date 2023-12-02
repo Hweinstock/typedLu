@@ -231,27 +231,6 @@ test_typedVarP =
         P.parse typedVarP "y : string" ~?= Right (Name "y", StringType), 
         P.parse typedVarP "y : int -> string" ~?= Right (Name "y", FunctionType IntType StringType)]
 
--- NEW TESTS
--- test_stat :: Test
--- test_stat =
---   "parsing statements" ~:
---     TestList
---       [ P.parse statementP ";" ~?= Right Empty,
---         P.parse statementP "x=3" ~?= Right (Assign (Name "x") (Val (IntVal 3))),
---         P.parse statementP "if x then y=nil else end"
---           ~?= Right (If (Var (Name "x")) (Block [Assign (Name "y") (Val NilVal)]) (Block [])),
---         P.parse statementP "while nil do end"
---           ~?= Right (While (Val NilVal) (Block [])),
---         P.parse statementP "repeat ; ; until false"
---           ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False))), 
---         P.parse statementP "function foo(x: int): int return x + 5 end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))), 
---         P.parse statementP "foo = function (x: int): int return x + 5 end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType)] IntType (Block [Return (Op2 (Var (Name "x")) Plus (Val (IntVal 5)))])))),
---         P.parse statementP "function foo(): nil ; end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [] NilType (Block [Empty])))), 
---         P.parse statementP "foo = function (): nil ; end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [] NilType (Block [Empty])))),
---         P.parse statementP "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))), 
---         P.parse statementP "foo = function (x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))]))))
---       ]
-
 test_stat :: Test 
 test_stat = 
   "parsing statements2" ~: 
