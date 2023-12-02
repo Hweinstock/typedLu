@@ -69,6 +69,7 @@ CP2:
 - [ ] Implement `typeCheckBlock` and `typeCheckStatement`.
 
 Potential Extensions:
+- [ ] Be able to check types within stepper. 
 - [ ] Proper lexical scoping for function calls. 
 - [ ] User Defined types.
 - [ ] Allow optional types in tables and functions. 
