@@ -1,0 +1,5 @@
+f : int -> string = function (a : int) : string 
+    return "here"
+end 
+
+u : string | int = "s" 
