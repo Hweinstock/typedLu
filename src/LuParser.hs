@@ -97,7 +97,7 @@ varP = mkVar <$> prefixP <*> some indexP <|> Name <$> nameP
         <|> flip Proj <$> brackets expP
 
 typedVarP :: Parser (Var, LType) 
-typedVarP = liftA2 (,) varP (afterP ":" lTypeP)
+typedVarP = liftA2 (,) varP (afterP ":" lTypeP <|> pure UnknownType)
 
 reserved :: [String]
 reserved =
@@ -200,11 +200,13 @@ statement2P :: Parser Statement
 statement2P = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
   where
     assignP :: Parser Statement
-    assignP = Assign <$> varP <*> (stringP "=" *> expP)
+    assignP = AssignT <$> typedVarP <*> (stringP "=" *> expP)
     functionAssignP :: Parser Statement 
-    functionAssignP = liftA2 Assign (Name <$> (afterP "function" nameP)) (Val <$> unnamedFunctionP) where 
+    functionAssignP = liftA2 AssignT functionHeaderP (Val <$> unnamedFunctionP) where 
       unnamedFunctionP :: Parser Value
       unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
+      functionHeaderP :: Parser (Var, LType)
+      functionHeaderP = liftA2 (,) (Name <$> afterP "function" nameP) (pure UnknownType)
     ifP :: Parser Statement
     ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
     whileP :: Parser Statement

@@ -6,6 +6,7 @@ import Test.QuickCheck (Arbitrary (..), Gen)
 -- Potentially add Unknown, Any as we see fit. 
 data LType = 
     Never 
+    | UnknownType
     | NilType
     | IntType
     | StringType
