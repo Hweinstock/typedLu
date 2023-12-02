@@ -96,6 +96,9 @@ varP = mkVar <$> prefixP <*> some indexP <|> Name <$> nameP
       flip Dot <$> (P.string "." *> nameP)
         <|> flip Proj <$> brackets expP
 
+typedVarP :: Parser (Var, LType) 
+typedVarP = liftA2 (,) varP (afterP ":" lTypeP)
+
 reserved :: [String]
 reserved =
   [ "and",
@@ -191,6 +194,25 @@ tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
         fieldNameP = liftA2 FieldName nameP (afterP "=" expP)
         fieldKeyP :: Parser TableField
         fieldKeyP = liftA2 FieldKey (brackets expP) (afterP "=" expP)
+
+-- Temporary function
+statement2P :: Parser Statement 
+statement2P = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
+  where
+    assignP :: Parser Statement
+    assignP = Assign <$> varP <*> (stringP "=" *> expP)
+    functionAssignP :: Parser Statement 
+    functionAssignP = liftA2 Assign (Name <$> (afterP "function" nameP)) (Val <$> unnamedFunctionP) where 
+      unnamedFunctionP :: Parser Value
+      unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
+    ifP :: Parser Statement
+    ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
+    whileP :: Parser Statement
+    whileP = liftA2 While (afterP "while" expP) (afterP "do" blockP) <* stringP "end"
+    emptyP :: Parser Statement
+    emptyP = constP ";" Empty
+    repeatP :: Parser Statement
+    repeatP = liftA2 Repeat (afterP "repeat" blockP) (afterP "until" expP)
 
 statementP :: Parser Statement
 statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)

@@ -223,6 +223,14 @@ test_typedExp =
         P.parse typedExpP "f : int -> int" ~?= Right (Var (Name "f"), FunctionType IntType IntType)
       ]
 
+test_typedVarP :: Test 
+test_typedVarP = 
+  "parsing typed variables" ~:
+    TestList 
+      [ P.parse typedVarP "x : int" ~?= Right (Name "x", IntType), 
+        P.parse typedVarP "y : string" ~?= Right (Name "y", StringType), 
+        P.parse typedVarP "y : int -> string" ~?= Right (Name "y", FunctionType IntType StringType)]
+
 -- NEW TESTS
 test_stat :: Test
 test_stat =
@@ -244,8 +252,13 @@ test_stat =
         P.parse statementP "foo = function (x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo") (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))]))))
       ]
 
+test_stat2 :: Test 
+test_stat2 = 
+  "parsing statements2" ~: 
+    TestList 
+      [ P.parse statement2P "x : int = 3" ~?= Right (AssignT (Name "x", IntType) (Val (IntVal 3)))]
 test :: IO Counts
-test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp]
+test = runTestTT $ TestList [test_stat2, test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp, test_typedVarP]
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v

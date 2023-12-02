@@ -28,6 +28,7 @@ data Statement
   | Empty -- ';'
   | Repeat Block Expression -- repeat s until e
   | Return Expression -- return e
+  | AssignT (Var, LType) Expression --testing
   deriving (Eq, Show)
 
 type TypedExpression = (Expression, LType)
