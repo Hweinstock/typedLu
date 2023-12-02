@@ -216,23 +216,23 @@ statement2P = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|>
     repeatP :: Parser Statement
     repeatP = liftA2 Repeat (afterP "repeat" blockP) (afterP "until" expP)
 
-statementP :: Parser Statement
-statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
-  where
-    assignP :: Parser Statement
-    assignP = Assign <$> varP <*> (stringP "=" *> expP)
-    functionAssignP :: Parser Statement 
-    functionAssignP = liftA2 Assign (Name <$> (afterP "function" nameP)) (Val <$> unnamedFunctionP) where 
-      unnamedFunctionP :: Parser Value
-      unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
-    ifP :: Parser Statement
-    ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
-    whileP :: Parser Statement
-    whileP = liftA2 While (afterP "while" expP) (afterP "do" blockP) <* stringP "end"
-    emptyP :: Parser Statement
-    emptyP = constP ";" Empty
-    repeatP :: Parser Statement
-    repeatP = liftA2 Repeat (afterP "repeat" blockP) (afterP "until" expP)
+-- statementP :: Parser Statement
+-- statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
+--   where
+--     assignP :: Parser Statement
+--     assignP = Assign <$> varP <*> (stringP "=" *> expP)
+--     functionAssignP :: Parser Statement 
+--     functionAssignP = liftA2 Assign (Name <$> (afterP "function" nameP)) (Val <$> unnamedFunctionP) where 
+--       unnamedFunctionP :: Parser Value
+--       unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
+--     ifP :: Parser Statement
+--     ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
+--     whileP :: Parser Statement
+--     whileP = liftA2 While (afterP "while" expP) (afterP "do" blockP) <* stringP "end"
+--     emptyP :: Parser Statement
+--     emptyP = constP ";" Empty
+--     repeatP :: Parser Statement
+--     repeatP = liftA2 Repeat (afterP "repeat" blockP) (afterP "until" expP)
 
 blockP :: Parser Block
 blockP = Block <$> many statement2P
@@ -241,7 +241,7 @@ parseLuExp :: String -> Either P.ParseError Expression
 parseLuExp = P.parse expP
 
 parseLuStat :: String -> Either P.ParseError Statement
-parseLuStat = P.parse statementP
+parseLuStat = P.parse statement2P
 
 parseLuFile :: String -> IO (Either P.ParseError Block)
 parseLuFile = P.parseFromFile (const <$> blockP <*> P.eof)

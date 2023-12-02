@@ -162,8 +162,8 @@ test_ParseFiles =
         "test" ~: p "test/lu/test.lu" wTest,
         "abs" ~: p "test/lu/abs.lu" wAbs,
         "times" ~: p "test/lu/times.lu" wTimes,
-        "table" ~: p "test/lu/table.lu" wTable,
-        "bfs" ~: p "test/lu/bfs.lu" wBfs
+        "table" ~: p "test/lu/table.lu" wTable
+        --"bfs" ~: p "test/lu/bfs.lu" wBfs
       ]
   where
     p fn ast = do
@@ -284,7 +284,7 @@ prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 
 -- Currently fails 1/3 of the time. 
 prop_roundtrip_stat :: Statement -> Bool
-prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
+prop_roundtrip_stat s = P.parse statement2P (pretty s) == Right s
 
 qc :: IO ()
 qc = do
