@@ -28,8 +28,8 @@ returnFlagName = "_F"
 haltFlagName :: Name 
 haltFlagName = "_H"
 
-errorFlagName :: Name 
-errorFlagName = "_E"
+errorCodeName :: Name 
+errorCodeName = "_E"
 
 returnValueRef :: Reference
 returnValueRef = (globalTableName, StringVal returnValueName)
@@ -40,16 +40,29 @@ returnFlagRef = (globalTableName, StringVal returnFlagName)
 haltFlagRef :: Reference 
 haltFlagRef = (globalTableName, StringVal haltFlagName)
 
-errorFlagRef :: Reference 
-errorFlagRef = (globalTableName, StringVal errorFlagName)
+errorCodeRef :: Reference 
+errorCodeRef = (globalTableName, StringVal errorCodeName)
 
-isReturnFlagSet :: State Store Bool 
-isReturnFlagSet = do 
+throwError :: ErrorCode -> State Store () 
+throwError ec = update errorCodeRef (ErrorVal ec) >> update haltFlagRef (BoolVal True) 
+
+isError :: Value -> Bool 
+isError (ErrorVal _) = True 
+isError _ = False 
+
+isFlagSet :: Name -> State Store Bool 
+isFlagSet n = do 
   currentState <- S.get
-  value <- evalE (Var (Name returnFlagName))
+  value <- evalE (Var (Name n))
   return $ case value of 
     (BoolVal True) -> True 
     _ -> False
+
+isReturnFlagSet :: State Store Bool 
+isReturnFlagSet = isFlagSet returnFlagName
+
+isHaltFlagSet :: State Store Bool 
+isHaltFlagSet = isFlagSet haltFlagName
 
 initialStore :: Store
 initialStore = Map.singleton globalTableName Map.empty
@@ -145,38 +158,44 @@ resolveVar (Proj exp1 exp2) = do
 
 -- | Expression evaluator
 evalE :: Expression -> State Store Value
-evalE (Var v) = do
-  mr <- resolveVar v -- see above
-  case mr of
-    Just r -> index r
-    Nothing -> return NilVal
-evalE (Val v) = return v
-evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
-evalE (Op1 o e) = do
-  s <- S.get
-  e' <- evalE e
-  evalOp1 o e'
-evalE (TableConst _fs) = evalTableConst _fs
-evalE (Call func pps) = do 
-  fv <- evalE (Var func) 
-  case fv of 
-    (FunctionVal ps rt b) -> do 
-      let parameterNames = map fst ps
-      let pOrigValuesVars = map (Var . Name) parameterNames
-      pOrigValues <- seqEval pOrigValuesVars
+evalE e = do 
+  v <- doEvalE e
+  case v of 
+    (ErrorVal ec) -> throwError ec >> return v
+    _ -> return v
+  where 
+    doEvalE (Var v) = do
+      mr <- resolveVar v -- see above
+      case mr of
+        Just r -> index r
+        Nothing -> return NilVal
+    doEvalE (Val v) = return v
+    doEvalE (Op2 e1 o e2) = do evalOp2 o <$> evalE e1 <*> evalE e2
+    doEvalE (Op1 o e) = do
+      s <- S.get
+      e' <- evalE e
+      evalOp1 o e'
+    doEvalE (TableConst _fs) = evalTableConst _fs
+    doEvalE (Call func pps) = do 
+      fv <- evalE (Var func) 
+      case fv of 
+        (FunctionVal ps rt b) -> do 
+          let parameterNames = map fst ps
+          let pOrigValuesVars = map (Var . Name) parameterNames
+          pOrigValues <- seqEval pOrigValuesVars
 
-      -- Initialize parameters as values. 
-      setVars parameterNames pps 
-      eval b
-      returnValue <- evalE (Var (Name returnValueName))
-      -- Reset Flags/ReturnValue
-      update returnValueRef NilVal 
-      update returnFlagRef (BoolVal False)
+          -- Initialize parameters as values. 
+          setVars parameterNames pps 
+          eval b
+          returnValue <- evalE (Var (Name returnValueName))
+          -- Reset Flags/ReturnValue
+          update returnValueRef NilVal 
+          update returnFlagRef (BoolVal False)
 
-      -- Unscope Parameters i.e. NilValue them. 
-      setVars parameterNames (map Val pOrigValues)
-      return returnValue
-    _ -> return NilVal
+          -- Unscope Parameters i.e. NilValue them. 
+          setVars parameterNames (map Val pOrigValues)
+          return returnValue
+        _ -> return NilVal
 
 -- | Set list of parameters to list of expressions, return resulting state. 
 setVars :: [Name] -> [Expression] -> State Store () 
@@ -238,15 +257,15 @@ evalOp1 Len iv@(IntVal v) = return iv
 evalOp1 Len (BoolVal True) = return $ IntVal 1
 evalOp1 Len (BoolVal False) = return $ IntVal 0
 evalOp1 Not v = return $ BoolVal $ not $ toBool v
-evalOp1 _ _ = return NilVal
+evalOp1 _ _ = return $ ErrorVal IllegalArguments
 
 evalOp2 :: Bop -> Value -> Value -> Value
 evalOp2 Plus (IntVal i1) (IntVal i2) = IntVal (i1 + i2)
 evalOp2 Minus (IntVal i1) (IntVal i2) = IntVal (i1 - i2)
 evalOp2 Times (IntVal i1) (IntVal i2) = IntVal (i1 * i2)
-evalOp2 Divide (IntVal _) (IntVal 0) = NilVal
+evalOp2 Divide (IntVal _) (IntVal 0) = ErrorVal DivideByZero
 evalOp2 Divide (IntVal i1) (IntVal i2) = IntVal (i1 `div` i2)
-evalOp2 Modulo (IntVal i1) (IntVal 0) = NilVal
+evalOp2 Modulo (IntVal i1) (IntVal 0) = ErrorVal DivideByZero
 evalOp2 Modulo (IntVal i1) (IntVal i2) = IntVal $ i1 `mod` i2
 evalOp2 Eq v1 v2 = BoolVal $ v1 == v2
 evalOp2 Gt v1 v2 = BoolVal $ v1 > v2
@@ -254,7 +273,7 @@ evalOp2 Ge v1 v2 = BoolVal $ v1 >= v2
 evalOp2 Lt v1 v2 = BoolVal $ v1 < v2
 evalOp2 Le v1 v2 = BoolVal $ v1 <= v2
 evalOp2 Concat (StringVal s1) (StringVal s2) = StringVal (s1 ++ s2)
-evalOp2 _ _ _ = NilVal
+evalOp2 _ _ _ = ErrorVal IllegalArguments
 
 evaluate :: Expression -> Store -> Value
 evaluate e = S.evalState (evalE e)
@@ -273,7 +292,8 @@ eval (Block ss) = mapM_ evalS ss
 evalS :: Statement -> State Store ()
 evalS s = do 
   didReturn <- isReturnFlagSet 
-  if didReturn then return () else doEvalS s where 
+  didHalt <- isHaltFlagSet
+  if didReturn || didHalt then return () else doEvalS s where 
     doEvalS (If e s1 s2) = do
       v <- evalE e
       if toBool v then eval s1 else eval s2

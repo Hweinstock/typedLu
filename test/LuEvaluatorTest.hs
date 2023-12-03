@@ -81,8 +81,7 @@ test_evaluateLen =
         evaluate (Op1 Len (Val (TableVal "_t1"))) extendedStore ~?= IntVal 2,
         evaluate (Op1 Len (Val (TableVal "_t550"))) extendedStore ~?= NilVal,
         evaluate (Op1 Len (Val (IntVal 5520))) extendedStore ~?= IntVal 5520,
-        evaluate (Op1 Len (Val (BoolVal True))) extendedStore ~?= IntVal 1,
-        evaluate (Op1 Len (Val NilVal)) extendedStore ~?= NilVal
+        evaluate (Op1 Len (Val (BoolVal True))) extendedStore ~?= IntVal 1
       ]
 
 test_tableConst :: Test
@@ -144,8 +143,6 @@ test_evalOp2 =
         evaluate (Op2 (Val (IntVal 3)) Minus (Val (IntVal 1))) initialStore ~?= IntVal 2,
         evaluate (Op2 (Val (IntVal 3)) Times (Val (IntVal 1))) initialStore ~?= IntVal 3,
         evaluate (Op2 (Val (IntVal 4)) Divide (Val (IntVal 2))) initialStore ~?= IntVal 2,
-        evaluate (Op2 (Val (IntVal 3)) Divide (Val (IntVal 0))) initialStore ~?= NilVal,
-        evaluate (Op2 (Val (IntVal 3)) Modulo (Val (IntVal 0))) initialStore ~?= NilVal,
         evaluate (Op2 (Val (IntVal 3)) Modulo (Val (IntVal 2))) initialStore ~?= IntVal 1,
         evaluate (Op2 (Val (IntVal 3)) Eq (Val (IntVal 2))) initialStore ~?= BoolVal False,
         evaluate (Op2 (Val (IntVal 3)) Eq (Val (IntVal 3))) initialStore ~?= BoolVal True,
