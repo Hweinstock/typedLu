@@ -1,6 +1,7 @@
 module LuSyntax where
 
 import Control.Monad (mapM_)
+import Control.Applicative (liftA2)
 import qualified Data.Char as Char
 import Data.Map (Map)
 import LuTypes
@@ -22,13 +23,16 @@ instance Monoid Block where
   mempty = Block []
 
 data Statement
-  = Assign Var Expression -- x = e
+  = Assign TypedVar Expression -- x = e or x: type = e
   | If Expression Block Block -- if e then s1 else s2 end
   | While Expression Block -- while e do s end
   | Empty -- ';'
   | Repeat Block Expression -- repeat s until e
   | Return Expression -- return e
   deriving (Eq, Show)
+
+type TypedVar = (Var, LType)
+type TypedExpression = (Expression, LType)
 
 data Expression
   = Var Var -- global variables x and table indexing
@@ -104,7 +108,7 @@ wTest :: Block
 wTest =
   Block
     [ Assign
-        (Name "x")
+        (Name "x", UnknownType)
         ( Op2
             ( Op2
                 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2)))
@@ -114,12 +118,12 @@ wTest =
             Plus
             (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3)))
         ),
-      Assign (Name "y") (Val (IntVal 0)),
+      Assign (Name "y", UnknownType) (Val (IntVal 0)),
       While
         (Op2 (var "x") Gt (Val (IntVal 0)))
         ( Block
-            [ Assign (Name "y") (Op2 (var "y") Plus (var "x")),
-              Assign (Name "x") (Op2 (var "x") Minus (Val (IntVal 1)))
+            [ Assign (Name "y", UnknownType) (Op2 (var "y") Plus (var "x")),
+              Assign (Name "x", UnknownType) (Op2 (var "x") Minus (Val (IntVal 1)))
             ]
         )
     ]
@@ -128,21 +132,21 @@ wTest =
 wFact :: Block
 wFact =
   Block
-    [ Assign (Name "n") (Val (IntVal 5)),
-      Assign (Name "f") (Val (IntVal 1)),
+    [ Assign (Name "n", UnknownType) (Val (IntVal 5)),
+      Assign (Name "f", UnknownType) (Val (IntVal 1)),
       While
         (Op2 (var "n") Gt (Val (IntVal 0)))
         ( Block
-            [ Assign (Name "x") (Var (Name "n")),
-              Assign (Name "z") (Var (Name "f")),
+            [ Assign (Name "x", UnknownType) (Var (Name "n")),
+              Assign (Name "z", UnknownType) (Var (Name "f")),
               While
                 (Op2 (var "x") Gt (Val (IntVal 1)))
                 ( Block
-                    [ Assign (Name "f") (Op2 (var "z") Plus (Var (Name "f"))),
-                      Assign (Name "x") (Op2 (var "x") Minus (Val (IntVal 1)))
+                    [ Assign (Name "f", UnknownType) (Op2 (var "z") Plus (Var (Name "f"))),
+                      Assign (Name "x", UnknownType) (Op2 (var "x") Minus (Val (IntVal 1)))
                     ]
                 ),
-              Assign (Name "n") (Op2 (Var (Name "n")) Minus (Val (IntVal 1)))
+              Assign (Name "n", UnknownType) (Op2 (Var (Name "n")) Minus (Val (IntVal 1)))
             ]
         )
     ]
@@ -151,10 +155,10 @@ wFact =
 wAbs :: Block
 wAbs =
   Block
-    [ Assign (Name "x") (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))),
+    [ Assign (Name "x", UnknownType) (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))),
       If
         (Op2 (Var (Name "x")) Lt (Val (IntVal 0)))
-        (Block [Assign (Name "x") (Op2 (Val (IntVal 0)) Minus (Var (Name "x")))])
+        (Block [Assign (Name "x", UnknownType) (Op2 (Val (IntVal 0)) Minus (Var (Name "x")))])
         (Block [])
     ]
 
@@ -162,25 +166,25 @@ wAbs =
 wTimes :: Block
 wTimes =
   Block
-    [ Assign (Name "x") (Val (IntVal 10)),
-      Assign (Name "y") (Val (IntVal 3)),
-      Assign (Name "z") (Val (IntVal 0)),
+    [ Assign (Name "x", UnknownType) (Val (IntVal 10)),
+      Assign (Name "y", UnknownType) (Val (IntVal 3)),
+      Assign (Name "z", UnknownType) (Val (IntVal 0)),
       While
         (Op2 (Var (Name "x")) Gt (Val (IntVal 0)))
         ( Block
-            [ Assign (Name "z") (Op2 (Var (Name "z")) Plus (Var (Name "y"))),
-              Assign (Name "x") (Op2 (Var (Name "x")) Minus (Val (IntVal 1)))
+            [ Assign (Name "z", UnknownType) (Op2 (Var (Name "z")) Plus (Var (Name "y"))),
+              Assign (Name "x", UnknownType) (Op2 (Var (Name "x")) Minus (Val (IntVal 1)))
             ]
         )
     ]
 
 -- table.lu
 wTable :: Block
-wTable = Block [Assign (Name "a") (TableConst []), Assign (Name "k") (Val (StringVal "x")), Assign (Proj (Var (Name "a")) (Var (Name "k"))) (Val (IntVal 10)), Assign (Proj (Var (Name "a")) (Val (IntVal 20))) (Val (StringVal "great")), Assign (Name "o1") (Var (Proj (Var (Name "a")) (Val (StringVal "x")))), Assign (Name "k") (Val (IntVal 20)), Assign (Name "o2") (Var (Proj (Var (Name "a")) (Var (Name "k")))), Assign (Proj (Var (Name "a")) (Val (StringVal "x"))) (Op2 (Var (Proj (Var (Name "a")) (Val (StringVal "x")))) Plus (Val (IntVal 1))), Assign (Name "o3") (Var (Proj (Var (Name "a")) (Val (StringVal "x"))))]
+wTable = Block [Assign (Name "a", UnknownType) (TableConst []), Assign (Name "k", UnknownType) (Val (StringVal "x")), Assign (Proj (Var (Name "a")) (Var (Name "k")), UnknownType) (Val (IntVal 10)), Assign (Proj (Var (Name "a")) (Val (IntVal 20)), UnknownType) (Val (StringVal "great")), Assign (Name "o1", UnknownType) (Var (Proj (Var (Name "a")) (Val (StringVal "x")))), Assign (Name "k", UnknownType) (Val (IntVal 20)), Assign (Name "o2", UnknownType) (Var (Proj (Var (Name "a")) (Var (Name "k")))), Assign (Proj (Var (Name "a")) (Val (StringVal "x")), UnknownType) (Op2 (Var (Proj (Var (Name "a")) (Val (StringVal "x")))) Plus (Val (IntVal 1))), Assign (Name "o3", UnknownType) (Var (Proj (Var (Name "a")) (Val (StringVal "x"))))]
 
 -- bfs.lu
 wBfs :: Block
-wBfs = Block [Assign (Name "start") (Val (IntVal 1)), Assign (Name "goal") (Val (IntVal 10)), Empty, Assign (Name "graph") (TableConst []), Assign (Proj (Var (Name "graph")) (Val (IntVal 1))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 2)), FieldKey (Val (IntVal 2)) (Val (IntVal 3))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 2))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 6)), FieldKey (Val (IntVal 2)) (Val (IntVal 5)), FieldKey (Val (IntVal 3)) (Val (IntVal 1))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 3))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 1))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 4))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 7)), FieldKey (Val (IntVal 2)) (Val (IntVal 8))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 5))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 9)), FieldKey (Val (IntVal 2)) (Val (IntVal 10)), FieldKey (Val (IntVal 3)) (Val (IntVal 2))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 6))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 2))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 7))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 4)), FieldKey (Val (IntVal 2)) (Val (IntVal 11)), FieldKey (Val (IntVal 3)) (Val (IntVal 12))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 8))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 4))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 9))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 5))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 10))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 5))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 11))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 7))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 12))) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 7))]), Empty, Assign (Name "q") (TableConst [FieldName "elements" (TableConst []), FieldName "first" (Val (IntVal 0)), FieldName "last" (Val (IntVal 0))]), Assign (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "last"))) (Var (Name "start")), Assign (Dot (Var (Name "q")) "last") (Op2 (Var (Dot (Var (Name "q")) "last")) Plus (Val (IntVal 1))), Empty, Assign (Name "visited") (TableConst []), Assign (Proj (Var (Name "visited")) (Var (Name "start"))) (Val (BoolVal True)), Assign (Name "found") (Val (BoolVal False)), Empty, Repeat (Block [Assign (Name "node") (Var (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "first")))), Assign (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "first"))) (Val NilVal), Assign (Dot (Var (Name "q")) "first") (Op2 (Var (Dot (Var (Name "q")) "first")) Plus (Val (IntVal 1))), Empty, Assign (Proj (Var (Name "visited")) (Var (Name "node"))) (Val (BoolVal True)), If (Op2 (Var (Name "goal")) Eq (Var (Name "node"))) (Block [Assign (Name "found") (Val (BoolVal True)), Assign (Dot (Var (Name "q")) "first") (Var (Dot (Var (Name "q")) "last"))]) (Block [Assign (Name "i") (Val (IntVal 1)), While (Op2 (Var (Name "i")) Le (Op1 Len (Var (Proj (Var (Name "graph")) (Var (Name "node")))))) (Block [Assign (Name "next") (Var (Proj (Var (Proj (Var (Name "graph")) (Var (Name "node")))) (Var (Name "i")))), If (Op1 Not (Var (Proj (Var (Name "visited")) (Var (Name "next"))))) (Block [Assign (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "last"))) (Var (Name "next")), Assign (Dot (Var (Name "q")) "last") (Op2 (Var (Dot (Var (Name "q")) "last")) Plus (Val (IntVal 1)))]) (Block [Empty]), Assign (Name "i") (Op2 (Var (Name "i")) Plus (Val (IntVal 1)))])])]) (Op2 (Op2 (Var (Dot (Var (Name "q")) "last")) Minus (Var (Dot (Var (Name "q")) "first"))) Eq (Val (IntVal 0)))]
+wBfs = Block [Assign (Name "start", UnknownType) (Val (IntVal 1)), Assign (Name "goal", UnknownType) (Val (IntVal 10)), Empty, Assign (Name "graph", UnknownType) (TableConst []), Assign (Proj (Var (Name "graph")) (Val (IntVal 1)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 2)), FieldKey (Val (IntVal 2)) (Val (IntVal 3))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 2)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 6)), FieldKey (Val (IntVal 2)) (Val (IntVal 5)), FieldKey (Val (IntVal 3)) (Val (IntVal 1))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 3)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 1))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 4)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 7)), FieldKey (Val (IntVal 2)) (Val (IntVal 8))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 5)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 9)), FieldKey (Val (IntVal 2)) (Val (IntVal 10)), FieldKey (Val (IntVal 3)) (Val (IntVal 2))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 6)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 2))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 7)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 4)), FieldKey (Val (IntVal 2)) (Val (IntVal 11)), FieldKey (Val (IntVal 3)) (Val (IntVal 12))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 8)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 4))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 9)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 5))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 10)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 5))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 11)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 7))]), Assign (Proj (Var (Name "graph")) (Val (IntVal 12)), UnknownType) (TableConst [FieldKey (Val (IntVal 1)) (Val (IntVal 7))]), Empty, Assign (Name "q", UnknownType) (TableConst [FieldName "elements" (TableConst []), FieldName "first" (Val (IntVal 0)), FieldName "last" (Val (IntVal 0))]), Assign (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "last")), UnknownType) (Var (Name "start")), Assign (Dot (Var (Name "q")) "last", UnknownType) (Op2 (Var (Dot (Var (Name "q")) "last")) Plus (Val (IntVal 1))), Empty, Assign (Name "visited", UnknownType) (TableConst []), Assign (Proj (Var (Name "visited")) (Var (Name "start")), UnknownType) (Val (BoolVal True)), Assign (Name "found", UnknownType) (Val (BoolVal False)), Empty, Repeat (Block [Assign (Name "node", UnknownType) (Var (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "first")))), Assign (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "first")), UnknownType) (Val NilVal), Assign (Dot (Var (Name "q")) "first", UnknownType) (Op2 (Var (Dot (Var (Name "q")) "first")) Plus (Val (IntVal 1))), Empty, Assign (Proj (Var (Name "visited")) (Var (Name "node")), UnknownType) (Val (BoolVal True)), If (Op2 (Var (Name "goal")) Eq (Var (Name "node"))) (Block [Assign (Name "found", UnknownType) (Val (BoolVal True)), Assign (Dot (Var (Name "q")) "first", UnknownType) (Var (Dot (Var (Name "q")) "last"))]) (Block [Assign (Name "i", UnknownType) (Val (IntVal 1)), While (Op2 (Var (Name "i")) Le (Op1 Len (Var (Proj (Var (Name "graph")) (Var (Name "node")))))) (Block [Assign (Name "next", UnknownType) (Var (Proj (Var (Proj (Var (Name "graph")) (Var (Name "node")))) (Var (Name "i")))), If (Op1 Not (Var (Proj (Var (Name "visited")) (Var (Name "next"))))) (Block [Assign (Proj (Var (Dot (Var (Name "q")) "elements")) (Var (Dot (Var (Name "q")) "last")), UnknownType) (Var (Name "next")), Assign (Dot (Var (Name "q")) "last", UnknownType) (Op2 (Var (Dot (Var (Name "q")) "last")) Plus (Val (IntVal 1)))]) (Block [Empty]), Assign (Name "i", UnknownType) (Op2 (Var (Name "i")) Plus (Val (IntVal 1)))])])]) (Op2 (Op2 (Var (Dot (Var (Name "q")) "last")) Minus (Var (Dot (Var (Name "q")) "first"))) Eq (Val (IntVal 0)))]
 
 -- >>> wTest
 -- Block [Assign (Name "x") (Op2 (Op2 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))) Minus (Val (IntVal 3))) Plus (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3)))),Assign (Name "y") (Val (IntVal 0)),While (Op2 (Var (Name "x")) Gt (Val (IntVal 0))) (Block [Assign (Name "y") (Op2 (Var (Name "y")) Plus (Var (Name "x"))),Assign (Name "x") (Op2 (Var (Name "x")) Minus (Val (IntVal 1)))])]
@@ -214,6 +218,20 @@ instance PP String where
 
 instance PP Int where
   pp = PP.int
+
+instance PP TypedVar where 
+  pp (v, t) = pp v <> PP.char ':' <> pp t
+
+instance PP LType where 
+  pp Never = PP.text "never"
+  pp UnknownType = PP.text "unknown"
+  pp NilType = PP.text "nil"
+  pp IntType = PP.text "int"
+  pp StringType = PP.text "string"
+  pp BooleanType = PP.text "boolean"
+  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ',' <> pp t2)
+  pp (UnionType t1 t2) = pp t1 <> PP.char '|' <> pp t2 
+  pp (FunctionType t1 t2) = pp t1 <> PP.text "->" <> pp t2
 
 instance PP Var where
   pp (Name n) = PP.text n
@@ -349,6 +367,9 @@ genVar n =
   where
     n' = n `div` 2
 
+genTypedVar :: Int -> Gen TypedVar
+genTypedVar n = liftA2 (,) (genVar n) arbitrary
+
 -- | Generate a size-controlled expression
 genExp :: Int -> Gen Expression
 genExp 0 = QC.oneof [Var <$> genVar 0, Val <$> arbitrary]
@@ -381,10 +402,10 @@ genTableField n =
 
 -- | Generate a size-controlled statement
 genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = QC.oneof [Assign <$> genVar 0 <*> genExp 0, return Empty]
+genStatement n | n <= 1 = QC.oneof [Assign <$> genTypedVar 0 <*> genExp 0, return Empty]
 genStatement n =
   QC.frequency
-    [ (1, Assign <$> genVar n' <*> genExp n'),
+    [ (1, Assign <$> genTypedVar n' <*> genExp n'),
       (1, return Empty),
       (n, If <$> genExp n' <*> genBlock n' <*> genBlock n'),
       -- generate loops half as frequently as if statements

@@ -25,7 +25,7 @@ step (Block (w@(While e (Block ss)) : otherSs)) = do
   if toBool v
     then return $ Block (ss ++ [w] ++ otherSs)
     else return $ Block otherSs
-step (Block (a@(Assign v e) : otherSs)) = do
+step (Block (a@(Assign (v, _) e) : otherSs)) = do
   newState <- evalS a
   return $ Block otherSs
 step (Block ((Repeat b e) : otherSs)) = step (Block (While (Op1 Not e) b : otherSs))

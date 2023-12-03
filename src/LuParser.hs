@@ -74,7 +74,9 @@ expP = compP
         <|> Var <$> varP
         <|> parens expP
         <|> Val <$> valueP
-        
+
+typedExpP :: Parser TypedExpression 
+typedExpP = liftA2 (,) expP (afterP ":" lTypeP)
 
 -- | Parse an operator at a specified precedence level
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
@@ -93,6 +95,9 @@ varP = mkVar <$> prefixP <*> some indexP <|> Name <$> nameP
     indexP =
       flip Dot <$> (P.string "." *> nameP)
         <|> flip Proj <$> brackets expP
+
+typedVarP :: Parser TypedVar
+typedVarP = liftA2 (,) varP (afterP ":" lTypeP <|> pure UnknownType)
 
 reserved :: [String]
 reserved =
@@ -190,15 +195,17 @@ tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
         fieldKeyP :: Parser TableField
         fieldKeyP = liftA2 FieldKey (brackets expP) (afterP "=" expP)
 
-statementP :: Parser Statement
+statementP :: Parser Statement 
 statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
   where
     assignP :: Parser Statement
-    assignP = Assign <$> varP <*> (stringP "=" *> expP)
+    assignP = Assign <$> typedVarP <*> (stringP "=" *> expP)
     functionAssignP :: Parser Statement 
-    functionAssignP = liftA2 Assign (Name <$> (afterP "function" nameP)) (Val <$> unnamedFunctionP) where 
+    functionAssignP = liftA2 Assign functionHeaderP (Val <$> unnamedFunctionP) where 
       unnamedFunctionP :: Parser Value
       unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
+      functionHeaderP :: Parser TypedVar
+      functionHeaderP = liftA2 (,) (Name <$> afterP "function" nameP) (pure UnknownType)
     ifP :: Parser Statement
     ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
     whileP :: Parser Statement
