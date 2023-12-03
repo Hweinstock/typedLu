@@ -55,17 +55,19 @@ CP2:
 - [ ] Fix parser to get round-trip propert back (Harry)
 - [ ] Require tables to be type annotated in type checker? 
 - [x] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
+- [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [ ] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
-- [ ] Outline abitrary and shrinkfor well-typed programs.
-- [ ] Add additional quickCheck property for type checker about well-typed programs.
-- [ ] Implement arbitrary and shrink for well-typed programs. 
-- [ ] Implement arbitrary and shrink for `LType`.
+- [ ] Outline abitrary and shrink for well-typed programs. (Wes)
+- [ ] Add additional quickCheck property for type checker about well-typed programs. (Wes)
+- [ ] Implement arbitrary and shrink for well-typed programs. (Wes)
+- [ ] Implement arbitrary and shrink for `LType`. (Harry)
 - [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
 - [x] Add more advanced types to the parser (table, functions, unions)
 - [x] Modify evaluator to evaluate functions.
 - [ ] Extend E2E tests to include type checking step. (Harry)
 - [ ] Implement `checker`. 
 - [ ] Implement `synthesis`.
+- [ ] Require tables to be type annotated in type checker (unsure if necessary) 
 - [ ] Implement `typeCheckBlock` and `typeCheckStatement`.
 
 Potential Extensions:
