@@ -52,14 +52,14 @@ CP1:
 CP2:
 - [x] Augment parser to accept optional type signatures (Harry).
 - [x] Change evaluator to ignore type signatures. (Harry)
-- [ ] Fix parser to get round-trip propert back (Harry)
+- [x] Fix parser to get round-trip propert back (Harry)
 - [ ] Require tables to be type annotated in type checker? 
 - [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [ ] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
 - [ ] Outline abitrary and shrinkfor well-typed programs.
 - [ ] Add additional quickCheck property for type checker about well-typed programs.
 - [ ] Implement arbitrary and shrink for well-typed programs. 
-- [ ] Implement arbitrary and shrink for `LType`.
+- [x] Implement arbitrary and shrink for `LType`.
 - [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
 - [x] Add more advanced types to the parser (table, functions, unions)
 - [x] Modify evaluator to evaluate functions.
