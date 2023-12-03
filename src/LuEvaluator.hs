@@ -46,6 +46,18 @@ errorCodeRef = (globalTableName, StringVal errorCodeName)
 throwError :: ErrorCode -> State Store () 
 throwError ec = update errorCodeRef (ErrorVal ec) >> update haltFlagRef (BoolVal True) 
 
+didReturnOrHalt :: State Store Bool 
+didReturnOrHalt = do 
+  didReturn <- isReturnFlagSet 
+  didHalt <- isHaltFlagSet 
+  return $ didReturn || didHalt
+
+-- | Check if we should terminate, if so return stopCase otherwise continue with eval
+tryContinueEval :: a -> State Store a -> State Store a 
+tryContinueEval stopCase continue = do 
+  shouldStop <- didReturnOrHalt
+  if shouldStop then return stopCase else continue
+
 isError :: Value -> Bool 
 isError (ErrorVal _) = True 
 isError _ = False 
@@ -290,29 +302,26 @@ eval (Block ss) = mapM_ evalS ss
 
 -- | Statement evaluator
 evalS :: Statement -> State Store ()
-evalS s = do 
-  didReturn <- isReturnFlagSet 
-  didHalt <- isHaltFlagSet
-  if didReturn || didHalt then return () else doEvalS s where 
-    doEvalS (If e s1 s2) = do
-      v <- evalE e
-      if toBool v then eval s1 else eval s2
-    doEvalS w@(While e ss) = do
-      v <- evalE e
-      when (toBool v) $ do
-        eval ss
-        evalS w
-    doEvalS (Assign (v, _) e) = do
-      -- update global variable or table field v to value of e
-      s <- S.get
-      mRef <- resolveVar v
-      e' <- evalE e
-      case mRef of
-        Just ref -> update ref e'
-        _ -> return ()
-    doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-    doEvalS (Return e) = evalS (Assign (Name returnValueName, UnknownType) e) >> evalS (Assign (Name returnFlagName, BooleanType) (Val (BoolVal True)))
-    doEvalS Empty = return () -- do nothing
+evalS s = tryContinueEval () (doEvalS s) where 
+  doEvalS (If e s1 s2) = do
+    v <- evalE e
+    if toBool v then eval s1 else eval s2
+  doEvalS w@(While e ss) = do
+    v <- evalE e
+    when (toBool v) $ do
+      eval ss
+      evalS w
+  doEvalS (Assign (v, _) e) = do
+    -- update global variable or table field v to value of e
+    s <- S.get
+    mRef <- resolveVar v
+    e' <- evalE e
+    case mRef of
+      Just ref -> update ref e'
+      _ -> return ()
+  doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
+  doEvalS (Return e) = evalS (Assign (Name returnValueName, UnknownType) e) >> evalS (Assign (Name returnFlagName, BooleanType) (Val (BoolVal True)))
+  doEvalS Empty = return () -- do nothing
 
 exec :: Block -> Store -> Store
 exec = S.execState . eval

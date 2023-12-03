@@ -15,22 +15,24 @@ import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 
 step :: Block -> State Store Block
-step (Block ((If e (Block ss1) (Block ss2)) : otherSs)) = do
-  v <- evalE e
-  if toBool v
-    then return $ Block (ss1 ++ otherSs)
-    else return $ Block (ss2 ++ otherSs)
-step (Block (w@(While e (Block ss)) : otherSs)) = do
-  v <- evalE e
-  if toBool v
-    then return $ Block (ss ++ [w] ++ otherSs)
-    else return $ Block otherSs
-step (Block (a@(Assign (v, _) e) : otherSs)) = do
-  newState <- evalS a
-  return $ Block otherSs
-step (Block ((Repeat b e) : otherSs)) = step (Block (While (Op1 Not e) b : otherSs))
-step (Block (empty : otherSs)) = return $ Block otherSs
 step b@(Block []) = return b
+step b@(Block (s:ss)) = tryContinueEval (Block ss) (doStep b) where 
+  doStep (Block ((If e (Block ss1) (Block ss2)) : otherSs)) = do
+    v <- evalE e
+    if toBool v
+      then return $ Block (ss1 ++ otherSs)
+      else return $ Block (ss2 ++ otherSs)
+  doStep (Block (w@(While e (Block ss)) : otherSs)) = do
+    v <- evalE e
+    if toBool v
+      then return $ Block (ss ++ [w] ++ otherSs)
+      else return $ Block otherSs
+  doStep (Block (a@(Assign (v, _) e) : otherSs)) = do
+    newState <- evalS a
+    return $ Block otherSs
+  doStep (Block ((Repeat b e) : otherSs)) = doStep (Block (While (Op1 Not e) b : otherSs))
+  doStep (Block (empty : otherSs)) = return $ Block otherSs
+  doStep b@(Block []) = return b
 
 -- | Evaluate this block for a specified number of steps
 boundedStep :: Int -> Block -> State Store Block
