@@ -179,7 +179,7 @@ functionValP :: Parser Value
 functionValP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
 
 callP :: Parser Expression
-callP = liftA2 Call varP (parens (P.sepBy expP (wsP (P.char ','))))
+callP = wsP (liftA2 Call varP (parens (P.sepBy expP (wsP (P.char ',')))))
 
 returnP :: Parser Statement 
 returnP = Return <$> (afterP "return" expP) 
