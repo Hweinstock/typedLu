@@ -85,6 +85,7 @@ test_function =
              "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"), 
              "function7" ~: testFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)])
            ]
+
 test_typeSig :: Test 
 test_typeSig = 
     "e2e typeSig" ~: 
@@ -94,6 +95,13 @@ test_typeSig =
                 "typeSig2" ~: testFile "test/lu/typeSig2.lu" (checkVarExistsInStore "f" >> checkVarExistsInStore "u")
             ]
 
-
+test_error :: Test 
+test_error = 
+    "e2e error" ~: 
+        TestList 
+            [ 
+                "IllegalArguments1" ~: testFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal IllegalArguments)]), 
+                "IllegalArguments1" ~: testFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal DivideByZero)]) 
+            ]
 test :: IO Counts 
-test = runTestTT $ TestList [test_if, test_function, test_typeSig]
+test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]
