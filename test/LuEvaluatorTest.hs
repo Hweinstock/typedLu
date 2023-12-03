@@ -168,6 +168,21 @@ test_evalOp2 =
         evaluate (Op2 (Val (StringVal "hello ")) Concat (Val (StringVal "world!"))) initialStore ~?= StringVal "hello world!"
       ]
 
+test_error :: Test 
+test_error = 
+  "evaluating errors" ~:
+    TestList 
+    [
+      evaluate (Op2 (Val (IntVal 3)) Plus (Val (StringVal "here"))) initialStore ~?= ErrorVal IllegalArguments, 
+      evaluate (Op2 (Val (IntVal 3)) Plus (Val (BoolVal True))) initialStore ~?= ErrorVal IllegalArguments, 
+      evaluate (Op2 (Val (IntVal 10)) Plus (Val NilVal)) initialStore ~?= ErrorVal IllegalArguments, 
+      evaluate (Op2 (Val (BoolVal True)) Concat (Val NilVal)) initialStore ~?= ErrorVal IllegalArguments, 
+      evaluate (Op2 (Val (IntVal 10)) Times (Val (StringVal "here"))) initialStore ~?= ErrorVal IllegalArguments, 
+      evaluate (Op2 (Val (BoolVal True)) Divide (Val NilVal)) initialStore ~?= ErrorVal IllegalArguments, 
+      evaluate (Op2 (Val (IntVal 10)) Divide (Val (IntVal 0))) initialStore ~?= ErrorVal DivideByZero, 
+      evaluate (Op2 (Val (IntVal 10)) Divide (Op2 (Val (IntVal 5)) Minus (Val (IntVal 5)))) initialStore ~?= ErrorVal DivideByZero
+    ]
+
 tExecTest :: Test
 tExecTest =
   "exec wTest" ~:
@@ -235,7 +250,7 @@ tExecBfs = "exec wBfs" ~: TestList [global !? StringVal "found" ~?= Just (BoolVa
       Nothing -> Map.empty
 
 test :: IO Counts
-test = runTestTT $ TestList [test_index, test_update, test_resolveVar, test_evaluateNot, test_evaluateLen, test_tableConst, test_evalOp2, tExecTest, tExecFact, tExecAbs, tExecTimes, tExecTable, tExecBfs]
+test = runTestTT $ TestList [test_error, test_index, test_update, test_resolveVar, test_evaluateNot, test_evaluateLen, test_tableConst, test_evalOp2, tExecTest, tExecFact, tExecAbs, tExecTimes, tExecTable, tExecBfs]
 
 prop_evalE_total :: Expression -> Store -> Bool
 prop_evalE_total e s = case evaluate e s of
@@ -245,6 +260,7 @@ prop_evalE_total e s = case evaluate e s of
   StringVal s -> s `seq` True
   TableVal n -> n `seq` True
   FunctionVal ps rt b -> ps `seq` rt `seq` b `seq` True
+  ErrorVal _ -> True -- We don't generate these, so this won't be hit. 
 
 qc :: IO ()
 qc = do

@@ -22,14 +22,26 @@ globalTableName = "_G"
 returnValueName :: Name 
 returnValueName = "_R"
 
-returnValueRef :: Reference
-returnValueRef = (globalTableName, StringVal returnValueName)
-
 returnFlagName :: Name 
 returnFlagName = "_F"
 
+haltFlagName :: Name 
+haltFlagName = "_H"
+
+errorFlagName :: Name 
+errorFlagName = "_E"
+
+returnValueRef :: Reference
+returnValueRef = (globalTableName, StringVal returnValueName)
+
 returnFlagRef :: Reference
 returnFlagRef = (globalTableName, StringVal returnFlagName)
+
+haltFlagRef :: Reference 
+haltFlagRef = (globalTableName, StringVal haltFlagName)
+
+errorFlagRef :: Reference 
+errorFlagRef = (globalTableName, StringVal errorFlagName)
 
 isReturnFlagSet :: State Store Bool 
 isReturnFlagSet = do 
