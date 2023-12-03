@@ -53,8 +53,8 @@ didReturnOrHalt = do
   return $ didReturn || didHalt
 
 -- | Check if we should terminate, if so return stopCase otherwise continue with eval
-tryContinueEval :: a -> State Store a -> State Store a 
-tryContinueEval stopCase continue = do 
+continueWithFlags :: a -> State Store a -> State Store a 
+continueWithFlags stopCase continue = do 
   shouldStop <- didReturnOrHalt
   if shouldStop then return stopCase else continue
 
@@ -302,7 +302,7 @@ eval (Block ss) = mapM_ evalS ss
 
 -- | Statement evaluator
 evalS :: Statement -> State Store ()
-evalS s = tryContinueEval () (doEvalS s) where 
+evalS s = continueWithFlags () (doEvalS s) where 
   doEvalS (If e s1 s2) = do
     v <- evalE e
     if toBool v then eval s1 else eval s2

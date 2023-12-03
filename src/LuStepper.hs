@@ -16,7 +16,7 @@ import Test.QuickCheck qualified as QC
 
 step :: Block -> State Store Block
 step b@(Block []) = return b
-step b@(Block (s:ss)) = tryContinueEval (Block ss) (doStep b) where 
+step b@(Block (s:ss)) = continueWithFlags (Block ss) (doStep b) where 
   doStep (Block ((If e (Block ss1) (Block ss2)) : otherSs)) = do
     v <- evalE e
     if toBool v
