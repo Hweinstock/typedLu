@@ -229,7 +229,7 @@ instance PP LType where
   pp IntType = PP.text "int"
   pp StringType = PP.text "string"
   pp BooleanType = PP.text "boolean"
-  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ',' <> pp t2)
+  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ':' <> pp t2)
   pp (UnionType t1 t2) = pp t1 <> PP.char '|' <> pp t2 
   pp (FunctionType t1 t2) = pp t1 <> PP.text "->" <> pp t2
 

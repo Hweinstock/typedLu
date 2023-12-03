@@ -252,8 +252,20 @@ test_stat =
         P.parse statementP "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))), 
         P.parse statementP "foo = function (x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) 
       ]
+
+test_unit_roundtrip_stat :: Test
+test_unit_roundtrip_stat = 
+  "parsing unit tests from prop_round_trip_stat" ~: 
+    TestList 
+      [ P.parse statementP (pretty s) ~?= Right s, 
+        P.parse statementP (pretty s2) ~?= Right s2]
+    where 
+      s = Assign (Dot (Val (StringVal "")) "x0",TableType NilType IntType) (Val (BoolVal False))
+      s2 = Assign (Name "X0",TableType (UnionType StringType StringType) IntType) (Var (Name "xy"))
+  
+
 test :: IO Counts
-test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp, test_typedVarP]
+test = runTestTT $ TestList [test_unit_roundtrip_stat, test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp, test_typedVarP]
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v

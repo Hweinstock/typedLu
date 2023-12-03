@@ -23,12 +23,13 @@ instance Arbitrary LType where
     arbitrary :: Gen LType
     arbitrary = let base = 3 in QC.frequency [
         (0, return Never), 
-        (base, return NilType), 
-        (base, return IntType), 
-        (base, return BooleanType), 
+        (base, arbitraryBase), 
         (1, liftA2 TableType arbitrary arbitrary), 
-        (1, liftA2 UnionType arbitrary arbitrary), 
-        (1, liftA2 FunctionType arbitrary arbitrary)]
+        (1, liftA2 UnionType arbitraryBase arbitrary), 
+        (1, liftA2 FunctionType arbitraryBase arbitrary)]
+        where 
+            arbitraryBase :: Gen LType 
+            arbitraryBase = QC.elements [NilType, IntType, StringType, BooleanType]
 
     shrink :: LType -> [LType]
     shrink (TableType t1 t2) = [t1, t2]
