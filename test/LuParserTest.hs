@@ -274,6 +274,14 @@ test_unit_roundtrip_stat =
       s3 = Repeat (Block [Repeat (Block []) (Var (Name "_x")),Assign (Proj (Val (IntVal 0)) (Val (BoolVal False)),StringType) (Val (StringVal ""))]) (Var (Name "_x"))
       s4 = If (Var (Name "x0")) (Block [Repeat (Block []) (Var (Dot (Val (StringVal "")) "xy")),Assign (Proj (Val NilVal) (Val NilVal),IntType) (TableConst [])]) (Block [])
 
+-- TODO: Edge case currently ignored. 
+-- test_tableCall :: Test 
+-- test_tableCall = 
+--   "parsing calls from tables" ~: 
+--     TestList 
+--       [
+--         P.parse expP "t[1](x)" ~?= Right (Call (Proj (Var (Name "t")) (Val (IntVal 1))) [Var (Name "x")])
+--       ]
 test :: IO Counts
 test = runTestTT $ TestList [test_block, test_unit_roundtrip_stat, test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp, test_typedVarP]
 
