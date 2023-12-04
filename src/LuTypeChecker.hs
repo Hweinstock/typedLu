@@ -4,6 +4,7 @@ import Control.Monad
 import LuSyntax
 import State (State)
 import Data.Map (Map)
+import Data.List (nub)
 import qualified Data.Map as Map
 import LuTypes 
 
@@ -60,7 +61,7 @@ isTypeInstanceOf _ _ = False
 getFunctionReturnType :: LType -> LType 
 getFunctionReturnType (FunctionType _ f@(FunctionType _ _)) = getFunctionReturnType f
 getFunctionReturnType (FunctionType _ r) = r 
-getFunctionReturnType (FunctionType _ r) = Never
+getFunctionReturnType _ = Never -- Should never hit this case. 
 
 getFunctionParameterTypes :: LType -> [LType]
 getFunctionParameterTypes (FunctionType t f@(FunctionType _ _ )) = t : getFunctionParameterTypes f 
@@ -74,8 +75,32 @@ synthesis env (Var v) = getTypeFromEnv env v
 synthesis env (Val v) = synthVal v
 synthesis env (Op1 uop exp) = synthOp1 env uop exp
 synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
-synthesis env (TableConst tfs) = undefined 
+synthesis env (TableConst tfs) = synthTable env tfs  
 synthesis env (Call v pms) = synthCall env v pms 
+
+synthTable :: EnvironmentTypes -> [TableField] -> LType
+synthTable env tfs = let (keyTypes, valTypes) = foldr combineTableFieldTypes ([], []) tfs in TableType (constructType keyTypes) (constructType valTypes) where 
+    combineTableFieldTypes :: TableField -> ([LType], [LType]) -> ([LType], [LType])
+    combineTableFieldTypes tf (seenKeyTypes, seenValTypes) = 
+        let (curKeyType, curValType) = synthTableField env tf in 
+        let newKeyType = any (isTypeInstanceOf curKeyType) seenKeyTypes in 
+        let newValType = any (isTypeInstanceOf curValType) seenValTypes in
+        let newKeys = if newKeyType then curKeyType : seenKeyTypes else seenKeyTypes in 
+        let newVals = if newValType then curValType : seenValTypes else seenValTypes in 
+            (newKeys, newVals)
+    constructType :: [LType] -> LType 
+    constructType [] = AnyType 
+    constructType [t] = t 
+    constructType l = constructUnion (nub l) where 
+        constructUnion :: [LType] -> LType 
+        constructUnion [t1, t2] = UnionType t1 t2 
+        constructUnion (t1 : ts) = UnionType t1 (constructUnion ts)
+
+synthTableField :: EnvironmentTypes -> TableField -> (LType, LType)
+synthTableField env (FieldName n e) = synthTableField env (FieldKey (Val (StringVal n)) e) -- If fieldName, treat it as a string indexer.
+synthTableField env (FieldKey e1 e2) = (synthesis env e1, synthesis env e2) 
+
+
 
 synthCall :: EnvironmentTypes -> Var -> [Expression] -> LType
 synthCall env v = synthFunction env functionType where 
@@ -151,7 +176,7 @@ checker env e@(Var v) t = isTypeInstanceOf (synthesis env e) t
 checker env e@(Val v) t = isTypeInstanceOf (synthesis env e) t
 checker env e@(Op1 uop exp) t = isTypeInstanceOf (synthesis env e) t
 checker env e@(Op2 exp1 bop exp2) t = isTypeInstanceOf (synthesis env e) t
-checker env (TableConst tfs) t = undefined 
+checker env e@(TableConst tfs) t = isTypeInstanceOf (synthesis env e) t  
 checker env e@(Call v pms) t = isTypeInstanceOf (synthesis env e) t 
 
 checkParamTypes :: LType -> [LType] -> Bool 
