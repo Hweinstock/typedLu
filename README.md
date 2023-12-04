@@ -67,6 +67,7 @@ CP2:
 - [ ] Implement `synthesis`.
 - [ ] Require tables to be type annotated in type checker (unsure if necessary) 
 - [ ] Implement `typeCheckBlock` and `typeCheckStatement`.
+- [ ] Tweak parser to allow function class straight from tables. 
 
 Potential Extensions:
 - [ ] Be able to check types within stepper. 
