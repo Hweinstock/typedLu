@@ -49,6 +49,14 @@ getTypeFromEnv env (Name n) = case Map.lookup n env of
     Just t -> t 
     _ -> NilType
 
+compatible :: LType -> LType -> Bool 
+compatible (UnionType t1 t2) b = t1 == b || t2 == b
+compatible a (UnionType t1 t2) = t1 == a || t2 == a 
+compatible a AnyType = True 
+compatible AnyType b = True 
+compatible a b | a == b = True 
+compatible _ _ = False
+
 getFunctionReturnType :: LType -> LType 
 getFunctionReturnType (FunctionType _ f@(FunctionType _ _)) = getFunctionReturnType f
 getFunctionReturnType (FunctionType _ r) = r 
@@ -114,9 +122,9 @@ synthBopType env targetT returnT e1 e2 =
 
 -- | Check that type of given expression is same as given type. 
 checker :: EnvironmentTypes -> Expression -> LType -> Bool
-checker env (Var v) = undefined
-checker env (Val v) = undefined 
-checker env (Op1 uop exp) = undefined 
-checker env (Op2 exp1 bop exp2) = undefined
-checker env (TableConst tfs) = undefined 
-checker env (Call v pms) = undefined 
+checker env e@(Var v) t = compatible (synthesis env e) t
+checker env e@(Val v) t = compatible (synthesis env e) t
+checker env e@(Op1 uop exp) t = compatible (synthesis env e) t
+checker env e@(Op2 exp1 bop exp2) t = compatible (synthesis env e) t
+checker env (TableConst tfs) t = undefined 
+checker env e@(Call v pms) t = compatible (synthesis env e) t 
