@@ -49,10 +49,22 @@ getTypeFromEnv :: EnvironmentTypes -> Var -> LType
 getTypeFromEnv env (Name n) = case Map.lookup n env of 
     Just t -> t 
     _ -> NilType
+getTypeFromEnv env (Dot exp n) = case synthesis env exp of 
+    TableType t1 t2 -> if isTypeInstanceOf StringType t1 
+        then t2 
+        else Never
+    _ -> Never 
+getTypeFromEnv env (Proj exp1 exp2) = case (synthesis env exp1, synthesis env exp2) of 
+    (TableType t1 t2, projType) -> if isTypeInstanceOf projType t1
+        then t2 
+        else Never
+    _ -> Never
+    
 
 -- | Return true if the first type is an instance of the second type. 
 isTypeInstanceOf :: LType -> LType -> Bool 
-isTypeInstanceOf a b | a == b = True 
+isTypeInstanceOf a b | a == b = True
+isTypeInstanceOf a Never = False
 isTypeInstanceOf a AnyType = True 
 isTypeInstanceOf (UnionType a1 a2) b = isTypeInstanceOf a1 b && isTypeInstanceOf a2 b
 isTypeInstanceOf a (UnionType t1 t2) = isTypeInstanceOf a t1 || isTypeInstanceOf a t2
