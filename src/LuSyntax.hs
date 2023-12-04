@@ -57,7 +57,7 @@ type Parameter = (Name, LType)
 data Uop
   = Neg -- `-` :: Int -> Int
   | Not -- `not` :: a -> Bool
-  | Len -- `#` :: String -> Int / Table -> Int
+  | Len -- `#` :: String | Int | Table -> Int
   deriving (Eq, Show, Enum, Bounded)
 
 data Bop
