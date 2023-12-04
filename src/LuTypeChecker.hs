@@ -88,21 +88,6 @@ synthFunction env functionType params = if checkParamTypes functionType paramTyp
         where 
             paramTypes = map (synthesis env) params
 
--- synthFuncCall :: LType -> [LType] -> LType
--- synthFuncCall functionType paramTypes = 
---     let expectedPmsTypes = getFunctionParameterTypes functionType in 
---         if length expectedPmsTypes /= length paramTypes then 
---             Never  -- Illegal number of arguments
---         else 
---             let zipTypes = zip expectedPmsTypes paramTypes in 
---             let checkTypePair (expected, actual) = isTypeInstanceOf actual expected in
---             let validlyTyped = all checkTypePair zipTypes in 
---                 if validlyTyped then 
---                     getFunctionReturnType functionType 
---                 else 
---                     Never -- Some parameter is not properly typed.
-
-
 synthVar :: EnvironmentTypes -> Var -> LType
 synthVar env nm@(Name n) = getTypeFromEnv env nm 
 synthVar env (Dot exp n) = undefined 
