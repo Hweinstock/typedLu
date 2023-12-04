@@ -54,7 +54,7 @@ CP2:
 - [x] Change evaluator to ignore type signatures. (Harry)
 - [ ] Fix parser to get round-trip propert back (Harry)
 - [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
-- [ ] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
+- [x] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
 - [ ] Outline abitrary and shrink for well-typed programs. (Wes)
 - [ ] Add additional quickCheck property for type checker about well-typed programs. (Wes)
 - [ ] Implement arbitrary and shrink for well-typed programs. (Wes)
