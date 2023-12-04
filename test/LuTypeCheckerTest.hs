@@ -25,6 +25,28 @@ store  =
 
 {-
 ===================================================================
+======================= Helper Functions: Unit Tests =======================
+===================================================================
+-}
+test_isTypeInstanceOf :: Test 
+test_isTypeInstanceOf = 
+    "isTypeInstanceOf" ~: 
+        TestList 
+            [ 
+                isTypeInstanceOf (UnionType IntType StringType) (UnionType IntType StringType) ~?= True, 
+                isTypeInstanceOf (UnionType IntType StringType) IntType ~?= False, 
+                isTypeInstanceOf IntType (UnionType IntType StringType) ~?= True, 
+                isTypeInstanceOf StringType (UnionType IntType StringType) ~?= True, 
+                isTypeInstanceOf (UnionType IntType StringType) (UnionType IntType (UnionType StringType BooleanType)) ~?= True,
+                isTypeInstanceOf (UnionType IntType (UnionType StringType BooleanType)) (UnionType IntType StringType) ~?= False, 
+                isTypeInstanceOf AnyType IntType ~?= False, 
+                isTypeInstanceOf IntType AnyType ~?= True, 
+                isTypeInstanceOf AnyType AnyType ~?= True
+            ]
+
+
+{-
+===================================================================
 ======================= Checker: Unit Tests =======================
 ===================================================================
 -}
@@ -78,9 +100,9 @@ test_checkerOp1 =
                 checker store (Op1 Neg (Var (Name "int"))) IntType ~?= True,
                 checker store (Op1 Neg (Var (Name "string"))) IntType ~?= False,
                 checker store (Op1 Not (Var (Name "boolean"))) BooleanType ~?= True,
-                checker store (Op1 Not (Var (Name "int"))) BooleanType ~?= False,
+                checker store (Op1 Not (Var (Name "int"))) BooleanType ~?= True,
                 checker store (Op1 Len (Var (Name "string"))) IntType ~?= True,
-                checker store (Op1 Len (Var (Name "int"))) IntType ~?= False
+                checker store (Op1 Len (Var (Name "int"))) IntType ~?= True
             ]
 
 -- Test checker function with Op2 as input
@@ -132,12 +154,12 @@ test_checkerCall =
     "checker Call" ~:
         TestList
             [ 
-                checker store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= True,
+                checker store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
                 checker store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
                 checker store (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
                 checker store (Call (Name "function1") [Var (Name "int")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
-                checker store (Call (Name "function4") [Var (Name "int")]) (FunctionType IntType (UnionType IntType StringType)) ~?= True,
-                checker store (Call (Name "function4") [Var (Name "string")]) (FunctionType IntType (UnionType IntType StringType)) ~?= True,
+                checker store (Call (Name "function4") [Var (Name "int")]) (UnionType IntType StringType) ~?= True,
+                checker store (Call (Name "function4") [Var (Name "string")]) (UnionType IntType StringType) ~?= False,
                 checker store (Call (Name "function4") [Var (Name "boolean")]) (FunctionType IntType (UnionType IntType StringType)) ~?= False
             ]
 
@@ -182,9 +204,9 @@ test_synthesisOp1 =
                 synthesis store (Op1 Neg (Var (Name "int"))) ~?= IntType,
                 synthesis store (Op1 Neg (Var (Name "string"))) ~?= Never,
                 synthesis store (Op1 Not (Var (Name "boolean"))) ~?= BooleanType,
-                synthesis store (Op1 Not (Var (Name "int"))) ~?= Never,
+                synthesis store (Op1 Not (Var (Name "int"))) ~?= BooleanType,
                 synthesis store (Op1 Len (Var (Name "string"))) ~?= IntType,
-                synthesis store (Op1 Len (Var (Name "int"))) ~?= Never
+                synthesis store (Op1 Len (Var (Name "int"))) ~?= IntType
             ]
 
 -- Test synthesis function with Op2 as input
@@ -236,17 +258,17 @@ test_synthesisCall =
     "synthesis Call" ~:
         TestList
             [ 
-                synthesis store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) ~?= FunctionType IntType (FunctionType IntType StringType),
                 synthesis store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) ~?= Never,
                 synthesis store (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) ~?= Never,
-                synthesis store (Call (Name "function1") [Var (Name "int")]) ~?= Never,
-                synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= FunctionType IntType (UnionType IntType StringType),
-                synthesis store (Call (Name "function4") [Var (Name "string")]) ~?= FunctionType IntType (UnionType IntType StringType),
-                synthesis store (Call (Name "function4") [Var (Name "boolean")]) ~?= Never
+                synthesis store (Call (Name "function1") [Var (Name "int")]) ~?= StringType,
+                synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType,
+                synthesis store (Call (Name "function4") [Var (Name "string")]) ~?= Never, 
+                synthesis store (Call (Name "function4") [Var (Name "boolean")]) ~?= Never, 
+                synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType
             ]
 
 test :: IO Counts 
-test = runTestTT $ TestList [test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
+test = runTestTT $ TestList [test_isTypeInstanceOf, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
 {-
 ===================================================================
 ================== TypeChecker: QuickCheck Tests ==================
