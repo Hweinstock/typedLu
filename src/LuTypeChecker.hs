@@ -79,27 +79,18 @@ synthesis env (TableConst tfs) = synthTable env tfs
 synthesis env (Call v pms) = synthCall env v pms 
 
 synthTable :: EnvironmentTypes -> [TableField] -> LType
-synthTable env tfs = let (keyTypes, valTypes) = foldr combineTableFieldTypes ([], []) tfs in TableType (constructType keyTypes) (constructType valTypes) where 
-    combineTableFieldTypes :: TableField -> ([LType], [LType]) -> ([LType], [LType])
-    combineTableFieldTypes tf (seenKeyTypes, seenValTypes) = 
-        let (curKeyType, curValType) = synthTableField env tf in 
-        let newKeyType = any (isTypeInstanceOf curKeyType) seenKeyTypes in 
-        let newValType = any (isTypeInstanceOf curValType) seenValTypes in
-        let newKeys = if newKeyType then curKeyType : seenKeyTypes else seenKeyTypes in 
-        let newVals = if newValType then curValType : seenValTypes else seenValTypes in 
-            (newKeys, newVals)
-    constructType :: [LType] -> LType 
-    constructType [] = AnyType 
-    constructType [t] = t 
-    constructType l = constructUnion (nub l) where 
-        constructUnion :: [LType] -> LType 
-        constructUnion [t1, t2] = UnionType t1 t2 
-        constructUnion (t1 : ts) = UnionType t1 (constructUnion ts)
+synthTable env tfs = let (keyTypes, valTypes) = unzip (map (synthTableField env) tfs) in 
+    TableType (constructType keyTypes) (constructType valTypes) where 
+        constructType :: [LType] -> LType 
+        constructType [] = UnknownType
+        constructType [t] = t 
+        constructType (t : ts) | any (isTypeInstanceOf t) ts = constructType ts
+        constructType [t1, t2] = UnionType t1 t2 
+        constructType (t : ts) = UnionType t (constructType ts)
 
 synthTableField :: EnvironmentTypes -> TableField -> (LType, LType)
 synthTableField env (FieldName n e) = synthTableField env (FieldKey (Val (StringVal n)) e) -- If fieldName, treat it as a string indexer.
 synthTableField env (FieldKey e1 e2) = (synthesis env e1, synthesis env e2) 
-
 
 
 synthCall :: EnvironmentTypes -> Var -> [Expression] -> LType

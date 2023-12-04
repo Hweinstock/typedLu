@@ -246,10 +246,10 @@ test_synthesisTableConst =
         TestList
             [ 
                 synthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "int"))]) ~?= TableType StringType IntType,
-                synthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) ~?= Never,
+                synthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
                 synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) ~?= TableType StringType IntType,
-                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) ~?= Never,
-                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) ~?= Never
+                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
+                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) ~?= TableType (UnionType StringType IntType) IntType
             ]
 
 -- Test synthesis function with Call as input
