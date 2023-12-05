@@ -70,25 +70,19 @@ isTypeInstanceOf (UnionType a1 a2) b = isTypeInstanceOf a1 b && isTypeInstanceOf
 isTypeInstanceOf a (UnionType t1 t2) = isTypeInstanceOf a t1 || isTypeInstanceOf a t2
 isTypeInstanceOf _ _ = False
 
-getFunctionReturnType :: LType -> LType 
-getFunctionReturnType (FunctionType _ f@(FunctionType _ _)) = getFunctionReturnType f
-getFunctionReturnType (FunctionType _ r) = r 
-getFunctionReturnType _ = Never -- Should never hit this case. 
+checkSameType :: EnvironmentTypes -> Expression -> Expression -> Bool 
+checkSameType env e1 e2 = synthesis env e1 == synthesis env e2
 
-getFunctionParameterTypes :: LType -> [LType]
-getFunctionParameterTypes (FunctionType t f@(FunctionType _ _ )) = t : getFunctionParameterTypes f 
-getFunctionParameterTypes (FunctionType NilType _) = []
-getFunctionParameterTypes (FunctionType t _) = [t]
-getFunctionParameterTypes _ = [] -- Should never hit this case. 
+getFuncRType :: LType -> LType 
+getFuncRType (FunctionType _ f@(FunctionType _ _)) = getFuncRType f
+getFuncRType (FunctionType _ r) = r 
+getFuncRType _ = Never -- Should never hit this case. 
 
--- | Determine type of a given expression with environment. 
-synthesis :: EnvironmentTypes -> Expression -> LType
-synthesis env (Var v) = getTypeFromEnv env v
-synthesis env (Val v) = synthVal v
-synthesis env (Op1 uop exp) = synthOp1 env uop exp
-synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
-synthesis env (TableConst tfs) = synthTable env tfs  
-synthesis env (Call v pms) = synthCall env v pms 
+getFuncParamTypes :: LType -> [LType]
+getFuncParamTypes (FunctionType t f@(FunctionType _ _ )) = t : getFuncParamTypes f 
+getFuncParamTypes (FunctionType NilType _) = []
+getFuncParamTypes (FunctionType t _) = [t]
+getFuncParamTypes _ = [] -- Should never hit this case. 
 
 synthTable :: EnvironmentTypes -> [TableField] -> LType
 synthTable env tfs = let (keyTypes, valTypes) = unzip (map (synthTableField env) tfs) in 
@@ -107,15 +101,17 @@ synthTableField env (FieldKey e1 e2) = (synthesis env e1, synthesis env e2)
 
 
 synthCall :: EnvironmentTypes -> Var -> [Expression] -> LType
-synthCall env v = synthFunction env functionType where 
-    functionType = synthesis env (Var v)
+synthCall env v = synthFunction env (synthesis env (Var v))
 
 synthFunction :: EnvironmentTypes -> LType -> [Expression] -> LType 
-synthFunction env functionType params = if checkParamTypes functionType paramTypes
-    then getFunctionReturnType functionType 
-    else Never 
-        where 
-            paramTypes = map (synthesis env) params
+synthFunction env (FunctionType NilType returnType) [] = returnType
+synthFunction env (FunctionType paramType (FunctionType _ _)) [p] = Never -- Not enough arguments
+synthFunction env (FunctionType paramType returnType) [p] = 
+    if checker env p paramType then returnType else Never
+synthFunction env (FunctionType paramType returnType) (p : ps) = 
+    if checker env p paramType then synthFunction env returnType ps else Never
+synthFunction env _ _ = Never
+    
 
 synthVar :: EnvironmentTypes -> Var -> LType
 synthVar env nm@(Name n) = getTypeFromEnv env nm 
@@ -174,6 +170,15 @@ synthComparisonOp env e1 e2 = if checkSameType env e1 e2
     then synthFunction env comparisonOpType [e1, e2]
     else Never -- not same type, can't compare
 
+-- | Determine type of a given expression with environment. 
+synthesis :: EnvironmentTypes -> Expression -> LType
+synthesis env (Var v) = getTypeFromEnv env v
+synthesis env (Val v) = synthVal v
+synthesis env (Op1 uop exp) = synthOp1 env uop exp
+synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
+synthesis env (TableConst tfs) = synthTable env tfs  
+synthesis env (Call v pms) = synthCall env v pms 
+
 -- | Check that type of given expression is an instance of given type. 
 checker :: EnvironmentTypes -> Expression -> LType -> Bool
 checker env e@(Var v) t = isTypeInstanceOf (synthesis env e) t
@@ -182,13 +187,3 @@ checker env e@(Op1 uop exp) t = isTypeInstanceOf (synthesis env e) t
 checker env e@(Op2 exp1 bop exp2) t = isTypeInstanceOf (synthesis env e) t
 checker env e@(TableConst tfs) t = isTypeInstanceOf (synthesis env e) t  
 checker env e@(Call v pms) t = isTypeInstanceOf (synthesis env e) t 
-
-checkParamTypes :: LType -> [LType] -> Bool 
-checkParamTypes functionType paramTypes = 
-    let expectedPmsTypes = getFunctionParameterTypes functionType in 
-    let zipTypes = zip expectedPmsTypes paramTypes in 
-    let checkTypePair (expected, actual) = isTypeInstanceOf actual expected in
-        all checkTypePair zipTypes && length expectedPmsTypes == length paramTypes
-
-checkSameType :: EnvironmentTypes -> Expression -> Expression -> Bool 
-checkSameType env e1 e2 = synthesis env e1 == synthesis env e2
