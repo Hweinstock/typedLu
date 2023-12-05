@@ -8,10 +8,6 @@ import Data.List (nub)
 import qualified Data.Map as Map
 import LuTypes 
 
-
-isValueType :: LType -> Bool 
-isValueType = undefined
-
 newtype EitherT m a = EitherT { runEitherT :: m (Either String a) }
 
 instance Monad m => Monad (EitherT m) where 
@@ -45,6 +41,8 @@ typeCheckBlock = undefined
 typeCheckStatement :: Statement -> TypecheckerState
 typeCheckStatement = undefined
 
+-- | Lookup type in store, if not found, return NilType.
+--   For dot/proj, if table doesn't exist -> Never, or if key type doesn't match type key type.
 getTypeFromEnv :: EnvironmentTypes -> Var -> LType
 getTypeFromEnv env (Name n) = case Map.lookup n env of 
     Just t -> t 
@@ -99,24 +97,18 @@ synthTableField :: EnvironmentTypes -> TableField -> (LType, LType)
 synthTableField env (FieldName n e) = synthTableField env (FieldKey (Val (StringVal n)) e) -- If fieldName, treat it as a string indexer.
 synthTableField env (FieldKey e1 e2) = (synthesis env e1, synthesis env e2) 
 
-
 synthCall :: EnvironmentTypes -> Var -> [Expression] -> LType
-synthCall env v = synthFunction env (synthesis env (Var v))
+synthCall env v = synthParams env (synthesis env (Var v))
 
-synthFunction :: EnvironmentTypes -> LType -> [Expression] -> LType 
-synthFunction env (FunctionType NilType returnType) [] = returnType
-synthFunction env (FunctionType paramType (FunctionType _ _)) [p] = Never -- Not enough arguments
-synthFunction env (FunctionType paramType returnType) [p] = 
+-- | Generalized function to typecheck parameters for any function type. 
+synthParams :: EnvironmentTypes -> LType -> [Expression] -> LType 
+synthParams env (FunctionType NilType returnType) [] = returnType
+synthParams env (FunctionType paramType (FunctionType _ _)) [p] = Never -- Not enough arguments
+synthParams env (FunctionType paramType returnType) [p] = 
     if checker env p paramType then returnType else Never
-synthFunction env (FunctionType paramType returnType) (p : ps) = 
-    if checker env p paramType then synthFunction env returnType ps else Never
-synthFunction env _ _ = Never
-    
-
-synthVar :: EnvironmentTypes -> Var -> LType
-synthVar env nm@(Name n) = getTypeFromEnv env nm 
-synthVar env (Dot exp n) = undefined 
-synthVar env (Proj exp1 exp2) = undefined 
+synthParams env (FunctionType paramType returnType) (p : ps) = 
+    if checker env p paramType then synthParams env returnType ps else Never
+synthParams env _ _ = Never -- Shouldn't happen
 
 synthVal :: Value -> LType 
 synthVal NilVal = NilType
@@ -124,12 +116,11 @@ synthVal (IntVal _) = IntType
 synthVal (BoolVal _) = BooleanType 
 synthVal (StringVal _) = StringType 
 synthVal (TableVal n) = undefined --what is this case? 
-synthVal (FunctionVal pms rt _) = synthFunc pms rt
-
-synthFunc :: [Parameter] -> LType -> LType 
-synthFunc [] rt = FunctionType NilType rt 
-synthFunc [(_, t)] rt = FunctionType t rt
-synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
+synthVal (FunctionVal pms rt _) = synthFunc pms rt where 
+    synthFunc :: [Parameter] -> LType -> LType 
+    synthFunc [] rt = FunctionType NilType rt 
+    synthFunc [(_, t)] rt = FunctionType t rt
+    synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
 
 synthOp1 :: EnvironmentTypes -> Uop -> Expression -> LType
 synthOp1 env Neg e = let eIsInt = checker env e IntType in 
@@ -153,21 +144,21 @@ concatType :: LType
 concatType = FunctionType StringType (FunctionType StringType StringType)
 
 synthOp2 :: EnvironmentTypes -> Bop -> Expression -> Expression -> LType                            
-synthOp2 env Plus e1 e2 = synthFunction env arithmeticOpType [e1, e2]
-synthOp2 env Minus e1 e2 = synthFunction env arithmeticOpType [e1, e2]
-synthOp2 env Times e1 e2 = synthFunction env arithmeticOpType [e1, e2]
-synthOp2 env Divide e1 e2= synthFunction env arithmeticOpType [e1, e2]
-synthOp2 env Modulo e1 e2 = synthFunction env arithmeticOpType [e1, e2]
+synthOp2 env Plus e1 e2 = synthParams env arithmeticOpType [e1, e2]
+synthOp2 env Minus e1 e2 = synthParams env arithmeticOpType [e1, e2]
+synthOp2 env Times e1 e2 = synthParams env arithmeticOpType [e1, e2]
+synthOp2 env Divide e1 e2= synthParams env arithmeticOpType [e1, e2]
+synthOp2 env Modulo e1 e2 = synthParams env arithmeticOpType [e1, e2]
 synthOp2 env Eq e1 e2 = synthComparisonOp env e1 e2 
 synthOp2 env Gt e1 e2 = synthComparisonOp env e1 e2  
 synthOp2 env Ge e1 e2 = synthComparisonOp env e1 e2 
 synthOp2 env Lt e1 e2 = synthComparisonOp env e1 e2 
 synthOp2 env Le e1 e2 = synthComparisonOp env e1 e2 
-synthOp2 env Concat e1 e2 = synthFunction env concatType [e1, e2]
+synthOp2 env Concat e1 e2 = synthParams env concatType [e1, e2]
 
 synthComparisonOp :: EnvironmentTypes -> Expression -> Expression -> LType
 synthComparisonOp env e1 e2 = if checkSameType env e1 e2
-    then synthFunction env comparisonOpType [e1, e2]
+    then synthParams env comparisonOpType [e1, e2]
     else Never -- not same type, can't compare
 
 -- | Determine type of a given expression with environment. 
@@ -181,9 +172,5 @@ synthesis env (Call v pms) = synthCall env v pms
 
 -- | Check that type of given expression is an instance of given type. 
 checker :: EnvironmentTypes -> Expression -> LType -> Bool
-checker env e@(Var v) t = isTypeInstanceOf (synthesis env e) t
-checker env e@(Val v) t = isTypeInstanceOf (synthesis env e) t
-checker env e@(Op1 uop exp) t = isTypeInstanceOf (synthesis env e) t
-checker env e@(Op2 exp1 bop exp2) t = isTypeInstanceOf (synthesis env e) t
-checker env e@(TableConst tfs) t = isTypeInstanceOf (synthesis env e) t  
-checker env e@(Call v pms) t = isTypeInstanceOf (synthesis env e) t 
+checker env e = isTypeInstanceOf (synthesis env e)
+

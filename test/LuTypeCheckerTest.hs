@@ -26,7 +26,7 @@ store  =
 
 {-
 ===================================================================
-======================= Helper Functions: Unit Tests =======================
+======================= Helper Functions: Unit Tests ==============
 ===================================================================
 -}
 test_isTypeInstanceOf :: Test 
@@ -181,7 +181,8 @@ test_synthesisVar =
                 synthesis store (Var (Name "boolean")) ~?= BooleanType,
                 synthesis store (Var (Name "table1")) ~?= TableType StringType BooleanType,
                 synthesis store (Var (Name "function1")) ~?= FunctionType IntType StringType,
-                synthesis store (Var (Name "function4")) ~?= FunctionType IntType (UnionType IntType StringType)
+                synthesis store (Var (Name "function4")) ~?= FunctionType IntType (UnionType IntType StringType), 
+                synthesis store (Var (Dot (Var (Name "table1")) "n")) ~?= BooleanType
             ]
 
 -- Test synthesis function with Val as input
