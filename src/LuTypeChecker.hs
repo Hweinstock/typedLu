@@ -94,11 +94,12 @@ synthTable :: EnvironmentTypes -> [TableField] -> LType
 synthTable env tfs = let (keyTypes, valTypes) = unzip (map (synthTableField env) tfs) in 
     TableType (constructType keyTypes) (constructType valTypes) where 
         constructType :: [LType] -> LType 
-        constructType [] = UnknownType
-        constructType [t] = t 
-        constructType (t : ts) | any (isTypeInstanceOf t) ts = constructType ts
-        constructType [t1, t2] = UnionType t1 t2 
-        constructType (t : ts) = UnionType t (constructType ts)
+        constructType = foldr constructTypeHelper UnknownType where 
+            constructTypeHelper :: LType -> LType -> LType 
+            constructTypeHelper t1 UnknownType = t1
+            constructTypeHelper t1 accT | isTypeInstanceOf t1 accT = accT 
+            constructTypeHelper t1 accT | isTypeInstanceOf accT t1 = t1 
+            constructTypeHelper t1 accT = UnionType t1 accT
 
 synthTableField :: EnvironmentTypes -> TableField -> (LType, LType)
 synthTableField env (FieldName n e) = synthTableField env (FieldKey (Val (StringVal n)) e) -- If fieldName, treat it as a string indexer.

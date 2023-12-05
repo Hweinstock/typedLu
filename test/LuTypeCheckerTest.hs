@@ -14,6 +14,7 @@ store  =
     [ ("int", IntType),
       ("string", StringType),
       ("boolean", BooleanType),
+      ("int-or-string", UnionType IntType StringType), 
       ("table1", TableType StringType BooleanType),
       ("table2", TableType StringType IntType),
       ("table3", TableType BooleanType BooleanType),
@@ -249,7 +250,8 @@ test_synthesisTableConst =
                 synthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
                 synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) ~?= TableType StringType IntType,
                 synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
-                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) ~?= TableType (UnionType StringType IntType) IntType
+                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) ~?= TableType (UnionType StringType IntType) IntType, 
+                synthesis store (TableConst [FieldKey (Var (Name "int-or-string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) ~?= TableType (UnionType IntType StringType) IntType
             ]
 
 -- Test synthesis function with Call as input
