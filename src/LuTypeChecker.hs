@@ -43,16 +43,12 @@ typeCheckAST b = S.evalState (typeCheckBlock b) Map.empty
 getTypeEnv :: Block -> EnvironmentTypes 
 getTypeEnv b = S.execState (typeCheckBlock b) Map.empty
 
--- | typeCheck blocks in sequence (don't carry state from to the next)
--- Note edge case where we don't want to carry type context from one if body to another. 
-typeCheckBlocks :: [Block] -> TypecheckerState
-typeCheckBlocks = foldr helper (return $ Right ()) where 
-    helper :: Block -> TypecheckerState -> TypecheckerState
-    helper b ts = do 
-        res <- ts 
-        case res of 
-            l@(Left _) -> return l 
-            (Right _) -> typeCheckBlock b
+-- | typeCheck blocks individually, with some state. 
+typeCheckBlocks :: EnvironmentTypes -> [Block] -> Either String ()
+typeCheckBlocks env = foldr checkBlock (Right ()) where 
+    checkBlock :: Block -> Either String () -> Either String () 
+    checkBlock b l@(Left _) = l 
+    checkBlock b _ = S.evalState (typeCheckBlock b) env
     
 -- | Check that given expression is boolean, then check underlying blocks.
 typeCheckCondtionalBlocks :: Expression -> [Block] -> String -> TypecheckerState
@@ -60,7 +56,7 @@ typeCheckCondtionalBlocks exp bs errorMsg = do
     curStore <- S.get 
     if not (checker curStore exp BooleanType) 
         then return $ Left errorMsg
-        else typeCheckBlocks bs
+        else return $ typeCheckBlocks curStore bs
 
 -- | Given a block and an environment, check if the types are consistent in the block. 
 typeCheckBlock :: Block -> TypecheckerState
