@@ -74,7 +74,9 @@ getTypeEnvFile fp = do
     parseResult <- parseLuFile fp 
     case parseResult of 
         (Left l) -> return $ Left l
-        Right ast -> return $ Right (getTypeEnv ast)
+        Right ast -> case getTypeEnv ast of 
+            (Left l2) -> return $ Left l2
+            Right store -> return $ Right store
 
 test_if :: Test 
 test_if = 
@@ -126,7 +128,8 @@ test_typeCheck =
                 "times" ~: typeCheckFile "test/lu/times.lu" True, 
                 "optionalSig1" ~: typeCheckFile "test/lu/optionalSig1.lu" True, 
                 "optionalSig2" ~: typeCheckFile "test/lu/optionalSig2.lu" True, 
-                "recFunction" ~: typeCheckFile "test/lu/recFunction.lu" True
+                "recFunction" ~: typeCheckFile "test/lu/recFunction.lu" True, 
+                "function1" ~: typeCheckFile "test/lu/function1.lu" True
             ]
 
 test :: IO Counts 

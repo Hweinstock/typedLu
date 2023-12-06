@@ -33,6 +33,7 @@ type EnvironmentTypes = Map Name LType
 -- type TypecheckerState = EitherT (State EnvironmentTypes) ()  -- transformer version
 
 type TypecheckerState = State EnvironmentTypes (Either String ())
+type SynthesisState = State EnvironmentTypes LType
 
 returnTypeName :: Name 
 returnTypeName = "@R"
@@ -40,8 +41,12 @@ returnTypeName = "@R"
 typeCheckAST :: Block -> Either String () 
 typeCheckAST b = S.evalState (typeCheckBlock b) Map.empty
 
-getTypeEnv :: Block -> EnvironmentTypes 
-getTypeEnv b = S.execState (typeCheckBlock b) Map.empty
+getTypeEnv :: Block -> Either String EnvironmentTypes 
+getTypeEnv b = case S.runState (typeCheckBlock b) Map.empty of 
+    (Right (), finalStore) -> Right finalStore
+    (Left l, finalStore) -> Left l
+    
+    --S.execState (typeCheckBlock b) Map.empty
 
 -- | Generate error message with a type, expected type, and actual type. 
 errorMsg :: String -> LType -> LType -> String 
@@ -90,24 +95,14 @@ typeCheckStatement (Return exp) = do
 
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
-typeCheckAssign v f@(FunctionType _ _) exp = do 
-    s <- S.get 
-    let oldReturnType = getTypeFromEnv s (Name "@R")
-    let newReturnType = getFuncRType f 
-    S.modify (Map.insert "@R" newReturnType)
-    s2 <- S.get
-    let tExpType = synthesis s2 exp 
-    if not (tExpType <: f)
-        then return $ Left (errorMsg "AssignmentError" tExpType f)
-    else do
-        result <- doTypeAssignment s2 v f
-        S.modify (Map.insert "@R" oldReturnType)
-        return result
 typeCheckAssign v t exp = do 
     s <- S.get 
-    let tExpType = synthesis s exp 
+    res <- doTypeAssignment s v t -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
+    s2 <- S.get
+    let tExpType = synthesis s2 exp 
     if not (tExpType <: t) then 
-        return $ Left "Invalid type assignment"
+        --doTypeAssignment s v UnknownType -- Undo type assignment if it fails
+        return $ Left (errorMsg "AssignmentError" t tExpType)
     else doTypeAssignment s v t 
     
 doTypeAssignment :: EnvironmentTypes -> Var -> LType -> TypecheckerState
@@ -219,7 +214,9 @@ synthVal env (IntVal _) = IntType
 synthVal env (BoolVal _) = BooleanType 
 synthVal env (StringVal _) = StringType 
 synthVal env (TableVal n) = undefined --what is this case? 
-synthVal env (FunctionVal pms rt b) = case S.evalState (typeCheckBlock b) env of 
+synthVal env (FunctionVal pms rt b) = 
+    let functionEnv = prepareFunctionEnv pms rt in 
+        case S.evalState (typeCheckBlock b) functionEnv of 
     Right () -> synthFunc pms rt
     Left _ -> UnknownType
     where 
@@ -227,6 +224,10 @@ synthVal env (FunctionVal pms rt b) = case S.evalState (typeCheckBlock b) env of
         synthFunc [] rt = FunctionType NilType rt 
         synthFunc [(_, t)] rt = FunctionType t rt
         synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
+        prepareFunctionEnv :: [Parameter] -> LType -> EnvironmentTypes 
+        prepareFunctionEnv pms rt = foldr addToEnv env (("@R", rt) : pms) where 
+            addToEnv :: (Name, LType) -> EnvironmentTypes -> EnvironmentTypes
+            addToEnv (k, v) = Map.insert k v
 
 synthOp1 :: EnvironmentTypes -> Uop -> Expression -> LType
 synthOp1 env Neg e = let eIsInt = checker env e IntType in 
@@ -275,6 +276,11 @@ synthesis env (Op1 uop exp) = synthOp1 env uop exp
 synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
 synthesis env (TableConst tfs) = synthTable env tfs  
 synthesis env (Call v pms) = synthCall env v pms 
+
+synthesisWithState :: Expression -> SynthesisState 
+synthesisWithState exp = do
+    s <- S.get 
+    return $ synthesis s exp 
 
 -- | Check that type of given expression is an instance of given type. 
 checker :: EnvironmentTypes -> Expression -> LType -> Bool
