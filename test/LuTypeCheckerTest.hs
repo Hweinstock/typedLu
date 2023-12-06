@@ -29,20 +29,30 @@ store  =
 ======================= Helper Functions: Unit Tests ==============
 ===================================================================
 -}
-test_isTypeInstanceOf :: Test 
-test_isTypeInstanceOf = 
-    "isTypeInstanceOf" ~: 
+test_isSubtype:: Test 
+test_isSubtype = 
+    "test_isSubtype" ~: 
         TestList 
             [ 
-                isTypeInstanceOf (UnionType IntType StringType) (UnionType IntType StringType) ~?= True, 
-                isTypeInstanceOf (UnionType IntType StringType) IntType ~?= False, 
-                isTypeInstanceOf IntType (UnionType IntType StringType) ~?= True, 
-                isTypeInstanceOf StringType (UnionType IntType StringType) ~?= True, 
-                isTypeInstanceOf (UnionType IntType StringType) (UnionType IntType (UnionType StringType BooleanType)) ~?= True,
-                isTypeInstanceOf (UnionType IntType (UnionType StringType BooleanType)) (UnionType IntType StringType) ~?= False, 
-                isTypeInstanceOf AnyType IntType ~?= False, 
-                isTypeInstanceOf IntType AnyType ~?= True, 
-                isTypeInstanceOf AnyType AnyType ~?= True
+                (<:) (UnionType IntType StringType) (UnionType IntType StringType) ~?= True, 
+                (<:) (UnionType IntType StringType) IntType ~?= False, 
+                (<:) IntType (UnionType IntType StringType) ~?= True, 
+                (<:) StringType (UnionType IntType StringType) ~?= True, 
+                (<:) (UnionType IntType StringType) (UnionType IntType (UnionType StringType BooleanType)) ~?= True,
+                (<:) (UnionType IntType (UnionType StringType BooleanType)) (UnionType IntType StringType) ~?= False, 
+                (<:) AnyType IntType ~?= False, 
+                (<:) IntType AnyType ~?= True, 
+                (<:) AnyType AnyType ~?= True, 
+                FunctionType (UnionType IntType StringType) IntType <: FunctionType IntType IntType ~?= True, 
+                FunctionType IntType IntType <: FunctionType IntType (UnionType IntType StringType) ~?= True, 
+                FunctionType IntType (UnionType IntType StringType) <: FunctionType IntType IntType ~?= False, 
+                FunctionType IntType IntType <: FunctionType (UnionType IntType StringType) IntType ~?= False, 
+                FunctionType IntType StringType <: FunctionType IntType (UnionType IntType StringType) ~?= True, 
+                FunctionType (UnionType IntType StringType) (FunctionType IntType IntType) <: FunctionType IntType (FunctionType IntType IntType) ~?= True, 
+                FunctionType IntType (FunctionType IntType IntType) <: FunctionType IntType (FunctionType IntType IntType) ~?= True, 
+                FunctionType IntType (FunctionType IntType StringType) <: FunctionType IntType (FunctionType IntType StringType) ~?= True,
+                FunctionType IntType (FunctionType IntType (UnionType BooleanType StringType)) <: FunctionType IntType (FunctionType IntType StringType) ~?= False
+
             ]
 
 
@@ -72,7 +82,7 @@ test_checkerVar =
                 checker store (Var (Name "function3")) (FunctionType IntType StringType) ~?= False,
                 checker store (Var (Name "function4")) (FunctionType IntType StringType) ~?= False,
                 checker store (Var (Name "function4")) (FunctionType IntType (UnionType IntType StringType)) ~?= True,
-                checker store (Var (Name "function1")) (FunctionType IntType (UnionType IntType StringType)) ~?= False
+                checker store (Var (Name "function1")) (FunctionType IntType (UnionType IntType StringType)) ~?= True
             ]
 
 -- Test checker function with Val as input
@@ -271,7 +281,7 @@ test_synthesisCall =
             ]
 
 test :: IO Counts 
-test = runTestTT $ TestList [test_isTypeInstanceOf, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
+test = runTestTT $ TestList [test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
 {-
 ===================================================================
 ================== TypeChecker: QuickCheck Tests ==================

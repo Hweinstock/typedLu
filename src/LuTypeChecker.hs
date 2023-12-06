@@ -75,7 +75,7 @@ typeCheckAssign v UnknownType exp = do
 typeCheckAssign v t exp = do 
     s <- S.get 
     let tExpType = synthesis s exp 
-    if not (isTypeInstanceOf tExpType t) then 
+    if not (tExpType <: t) then 
         return $ Left "Invalid type assignment"
     else doTypeAssignment s v t 
     
@@ -97,7 +97,7 @@ typeCheckAssign v t exp = do
 
 typecheckTableAccess :: LType -> LType -> LType -> Either String ()
 typecheckTableAccess (TableType kType vType) givenKType givenVType = 
-    if isTypeInstanceOf givenKType kType && isTypeInstanceOf givenVType vType 
+    if givenKType <: kType && givenVType <: vType 
         then Right () 
         else Left "Table type sealed"
 typecheckTableAccess _ _ _= Left "Unable to access value from non-table"
@@ -116,26 +116,27 @@ getTypeFromEnv env (Name n) = case Map.lookup n env of
     Just t -> t 
     _ -> NilType
 getTypeFromEnv env (Dot exp n) = case synthesis env exp of 
-    TableType t1 t2 -> if isTypeInstanceOf StringType t1 
+    TableType t1 t2 -> if StringType <: t1 
         then t2 
         else Never
     _ -> Never 
 getTypeFromEnv env (Proj exp1 exp2) = case (synthesis env exp1, synthesis env exp2) of 
-    (TableType t1 t2, projType) -> if isTypeInstanceOf projType t1
+    (TableType t1 t2, projType) -> if projType <: t1
         then t2 
         else Never
     _ -> Never
     
 
--- | Return true if the first type is an instance of the second type. 
-isTypeInstanceOf :: LType -> LType -> Bool 
-isTypeInstanceOf a b | a == b = True
-isTypeInstanceOf a Never = False
-isTypeInstanceOf a AnyType = True 
-isTypeInstanceOf (UnionType a1 a2) b = isTypeInstanceOf a1 b && isTypeInstanceOf a2 b
-isTypeInstanceOf a (UnionType t1 t2) = isTypeInstanceOf a t1 || isTypeInstanceOf a t2
-isTypeInstanceOf (TableType t1 t2) (TableType t3 t4) = isTypeInstanceOf t1 t3 && isTypeInstanceOf t2 t4
-isTypeInstanceOf _ _ = False
+-- | IsSubtype: Return true if first type is valid subtype of the second. 
+(<:) :: LType -> LType -> Bool 
+(<:) a b | a == b = True
+(<:) a Never = False
+(<:) a AnyType = True 
+(<:) (UnionType a1 a2) b = a1 <: b && a2 <: b
+(<:) a (UnionType t1 t2) = a <: t1 || a <: t2
+(<:) (TableType t1 t2) (TableType t3 t4) =  t1 <: t3 && t2 <: t4
+(<:) (FunctionType t1 t2) (FunctionType t3 t4) = t3 <: t1 && t2 <: t4
+(<:) _ _ = False
 
 checkSameType :: EnvironmentTypes -> Expression -> Expression -> Bool 
 checkSameType env e1 e2 = synthesis env e1 == synthesis env e2
@@ -158,8 +159,8 @@ synthTable env tfs = let (keyTypes, valTypes) = unzip (map (synthTableField env)
         constructType = foldr constructTypeHelper UnknownType where 
             constructTypeHelper :: LType -> LType -> LType 
             constructTypeHelper t1 UnknownType = t1
-            constructTypeHelper t1 accT | isTypeInstanceOf t1 accT = accT 
-            constructTypeHelper t1 accT | isTypeInstanceOf accT t1 = t1 
+            constructTypeHelper t1 accT | t1 <: accT = accT 
+            constructTypeHelper t1 accT | accT <: t1 = t1 
             constructTypeHelper t1 accT = UnionType t1 accT
 
 synthTableField :: EnvironmentTypes -> TableField -> (LType, LType)
@@ -241,5 +242,5 @@ synthesis env (Call v pms) = synthCall env v pms
 
 -- | Check that type of given expression is an instance of given type. 
 checker :: EnvironmentTypes -> Expression -> LType -> Bool
-checker env e = isTypeInstanceOf (synthesis env e)
+checker env e = (<:) (synthesis env e)
 
