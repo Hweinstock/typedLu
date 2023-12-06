@@ -283,7 +283,7 @@ instance PP Expression where
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
   pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
-  pp (Call fv ps) = undefined
+  pp (Call fv ps) = pp fv <> PP.parens (PP.hsep(map pp ps))
 
 instance PP TableField where
   pp (FieldName name e) = pp name <+> PP.equals <+> pp e
