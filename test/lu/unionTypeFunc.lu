@@ -1,4 +1,4 @@
-foo = function (x : int | string) : nil 
+foo = function (x : int | string) : int 
     y = 1
     z = x + y 
     ;

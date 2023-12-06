@@ -78,6 +78,13 @@ getTypeEnvFile fp = do
             (Left l2) -> return $ Left l2
             Right store -> return $ Right store
 
+showTypeEnvFile :: String -> IO () 
+showTypeEnvFile fp = do 
+    res <- getTypeEnvFile fp 
+    case res of 
+        Left l -> putStrLn l 
+        Right s -> putStrLn (show s)
+
 test_if :: Test 
 test_if = 
     "e2e testing if" ~:
@@ -129,7 +136,16 @@ test_typeCheck =
                 "optionalSig1" ~: typeCheckFile "test/lu/optionalSig1.lu" True, 
                 "optionalSig2" ~: typeCheckFile "test/lu/optionalSig2.lu" True, 
                 "recFunction" ~: typeCheckFile "test/lu/recFunction.lu" True, 
-                "function1" ~: typeCheckFile "test/lu/function1.lu" True
+                "function1" ~: typeCheckFile "test/lu/function1.lu" True, 
+                "function2" ~: typeCheckFile "test/lu/function2.lu" True, 
+                "function3" ~: typeCheckFile "test/lu/function3.lu" True, 
+                "function4" ~: typeCheckFile "test/lu/function4.lu" True, 
+                "function5" ~: typeCheckFile "test/lu/function5.lu" True, 
+                "function6" ~: typeCheckFile "test/lu/function6.lu" True, 
+                "function7" ~: typeCheckFile "test/lu/function7.lu" True, 
+                "function8" ~: typeCheckFile "test/lu/function8.lu" True, 
+                "unionTypeFunc" ~: typeCheckFile "test/lu/unionTypeFunc.lu" False, 
+                "weirdScopesFunc" ~: typeCheckFile "test/lu/weirdScopesFunc.lu" True
             ]
 
 test :: IO Counts 
