@@ -20,13 +20,13 @@ globalTableName :: Name
 globalTableName = "_G"
 
 returnValueName :: Name 
-returnValueName = "_R"
+returnValueName = "@R"
 
 returnValueRef :: Reference
 returnValueRef = (globalTableName, StringVal returnValueName)
 
 returnFlagName :: Name 
-returnFlagName = "_F"
+returnFlagName = "@F"
 
 returnFlagRef :: Reference
 returnFlagRef = (globalTableName, StringVal returnFlagName)

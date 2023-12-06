@@ -72,35 +72,28 @@ typeCheckAssign v UnknownType exp = do
     s <- S.get 
     let tExp = synthesis s exp
     typeCheckAssign v tExp exp 
-typeCheckAssign (Name n) t tExp = do 
+typeCheckAssign v t exp = do 
     s <- S.get 
-    let tExpType = synthesis s tExp
+    let tExpType = synthesis s exp 
     if not (isTypeInstanceOf tExpType t) then 
         return $ Left "Invalid type assignment"
-    else 
-        case getTypeFromEnv s (Name n) of 
-            NilType -> updateTypeEnv n tExpType
-            Never -> return $ Left "Unable to determine type of expression in assignment"
-            realT -> if realT /= tExpType then 
-                return $ Left "Cannot redefine variable to new type"
-                else updateTypeEnv n tExpType
-typeCheckAssign (Dot tExp n) t vExp = do 
-    s <- S.get 
-    let vExpType = synthesis s vExp 
-    let tExpType = synthesis s tExp
-    return $ if not (isTypeInstanceOf vExpType t) then 
-        Left "Invalid type assignment"
-    else 
-        typecheckTableAccess tExpType StringType vExpType
-typeCheckAssign (Proj tExp kExp) t vExp = do 
-    s <- S.get 
-    let vExpType = synthesis s vExp 
-    let kExpType = synthesis s kExp 
-    let tExpType = synthesis s tExp
-    return $ if not (isTypeInstanceOf vExpType t) then 
-        Left "Invalid type assignment"
-    else 
-        typecheckTableAccess tExpType kExpType vExpType
+    else doTypeAssignment s v t 
+    
+    where 
+        doTypeAssignment s (Name n) tExpType = do 
+            case getTypeFromEnv s (Name n) of 
+                NilType -> updateTypeEnv n tExpType
+                Never -> return $ Left "Unable to determine type of expression in assignment"
+                realT -> if realT /= tExpType then 
+                    return $ Left "Cannot redefine variable to new type"
+                    else updateTypeEnv n tExpType
+        doTypeAssignment s (Dot tExp n) vExpType = 
+            let tExpType = synthesis s tExp in
+                return $ typecheckTableAccess (synthesis s tExp) StringType vExpType
+        doTypeAssignment s (Proj tExp kExp) vExpType = do 
+            let kExpType = synthesis s kExp
+                tExpType = synthesis s tExp in
+                    return $ typecheckTableAccess tExpType kExpType vExpType
 
 typecheckTableAccess :: LType -> LType -> LType -> Either String ()
 typecheckTableAccess (TableType kType vType) givenKType givenVType = 
