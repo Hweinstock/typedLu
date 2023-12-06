@@ -229,7 +229,7 @@ instance PP LType where
   pp IntType = PP.text "int"
   pp StringType = PP.text "string"
   pp BooleanType = PP.text "boolean"
-  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ',' <> pp t2)
+  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ':' <> pp t2)
   pp (UnionType t1 t2) = pp t1 <> PP.char '|' <> pp t2 
   pp (FunctionType t1 t2) = pp t1 <> PP.text "->" <> pp t2
 
@@ -246,7 +246,10 @@ instance PP Value where
   pp NilVal = PP.text "nil"
   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
   pp (TableVal t) = PP.text "<" <> PP.text t <> PP.text ">"
-  pp (FunctionVal ps rt b) = undefined
+  pp (FunctionVal ps rt b) = PP.vcat [PP.text "function" <> PP.parens (ppParameters ps) <> PP.char ':' <> pp rt, pp b]
+
+instance PP Parameter where 
+  pp (n, t) = pp n <> PP.char ':' <> pp t
 
 isBase :: Expression -> Bool
 isBase TableConst {} = True
@@ -293,6 +296,9 @@ instance PP Block where
 ppSS :: [Statement] -> Doc
 ppSS ss = PP.vcat (map pp ss)
 
+ppParameters :: [Parameter] -> Doc 
+ppParameters ps = PP.hsep (map pp ps) 
+
 instance PP Statement where
   pp (Assign x e) = pp x <+> PP.equals <+> pp e
   pp (If guard b1 b2) =
@@ -306,7 +312,7 @@ instance PP Statement where
   pp (Repeat b e) =
     PP.hang (PP.text "repeat") 2 (pp b)
       PP.$+$ PP.text "until" <+> pp e
-  pp (Return e) = undefined
+  pp (Return e) = PP.text "return" <+> pp e
 
 level :: Bop -> Int
 level Times = 7
