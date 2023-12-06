@@ -34,6 +34,9 @@ type EnvironmentTypes = Map Name LType
 
 type TypecheckerState = State EnvironmentTypes (Either String ())
 
+returnTypeName :: Name 
+returnTypeName = "@R"
+
 -- | typeCheck blocks in sequence (don't carry state from to the next)
 -- Note edge case where we don't want to carry type context from one if body to another. 
 typeCheckBlocks :: [Block] -> TypecheckerState
@@ -65,13 +68,32 @@ typeCheckStatement (If exp b1 b2) = typeCheckCondtionalBlocks exp [b1, b2] "Non-
 typeCheckStatement (While exp b) = typeCheckCondtionalBlocks exp [b] "Non-boolean in while condition"
 typeCheckStatement Empty = return $ Right ()  
 typeCheckStatement (Repeat b exp) = typeCheckCondtionalBlocks exp [b] "Non-boolean in repeat condition"
-typeCheckStatement (Return exp) = undefined 
+typeCheckStatement (Return exp) = do 
+    s <- S.get
+    let expectedType = getTypeFromEnv s (Name "@R") 
+    let actualType = synthesis s exp 
+    if actualType <: expectedType 
+        then return $ Right () 
+        else return $ Left "Invalid return type"
 
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState
 typeCheckAssign v UnknownType exp = do 
     s <- S.get 
     let tExp = synthesis s exp
-    typeCheckAssign v tExp exp 
+    typeCheckAssign v tExp exp
+typeCheckAssign v f@(FunctionType _ _) exp = do 
+    s <- S.get 
+    let oldReturnType = getTypeFromEnv s (Name "@R")
+    let newReturnType = getFuncRType f 
+    S.modify (Map.insert "@R" newReturnType)
+    let tExpType = synthesis s exp 
+    if not (tExpType <: f) 
+        then return $ Left "Invalid type assignment"
+    else do
+        result <- doTypeAssignment s v f
+        S.modify (Map.insert "@R" oldReturnType)
+        return result
+
 typeCheckAssign v t exp = do 
     s <- S.get 
     let tExpType = synthesis s exp 
@@ -79,21 +101,21 @@ typeCheckAssign v t exp = do
         return $ Left "Invalid type assignment"
     else doTypeAssignment s v t 
     
-    where 
-        doTypeAssignment s (Name n) tExpType = do 
-            case getTypeFromEnv s (Name n) of 
-                NilType -> updateTypeEnv n tExpType
-                Never -> return $ Left "Unable to determine type of expression in assignment"
-                realT -> if realT /= tExpType then 
-                    return $ Left "Cannot redefine variable to new type"
-                    else updateTypeEnv n tExpType
-        doTypeAssignment s (Dot tExp n) vExpType = 
-            let tExpType = synthesis s tExp in
-                return $ typecheckTableAccess (synthesis s tExp) StringType vExpType
-        doTypeAssignment s (Proj tExp kExp) vExpType = do 
-            let kExpType = synthesis s kExp
-                tExpType = synthesis s tExp in
-                    return $ typecheckTableAccess tExpType kExpType vExpType
+doTypeAssignment :: EnvironmentTypes -> Var -> LType -> TypecheckerState
+doTypeAssignment s (Name n) tExpType = do 
+    case getTypeFromEnv s (Name n) of 
+        NilType -> updateTypeEnv n tExpType
+        Never -> return $ Left "Unable to determine type of expression in assignment"
+        realT -> if realT /= tExpType then 
+            return $ Left "Cannot redefine variable to new type"
+            else updateTypeEnv n tExpType
+doTypeAssignment s (Dot tExp n) vExpType = 
+    let tExpType = synthesis s tExp in
+        return $ typecheckTableAccess (synthesis s tExp) StringType vExpType
+doTypeAssignment s (Proj tExp kExp) vExpType = do 
+    let kExpType = synthesis s kExp
+        tExpType = synthesis s tExp in
+            return $ typecheckTableAccess tExpType kExpType vExpType
 
 typecheckTableAccess :: LType -> LType -> LType -> Either String ()
 typecheckTableAccess (TableType kType vType) givenKType givenVType = 
@@ -108,6 +130,10 @@ updateTypeEnv n t = do
     env <- S.get
     S.modify (Map.insert n t)
     return $ Right ()
+
+isFunctionType :: LType -> Bool 
+isFunctionType (FunctionType _ _ ) = True 
+isFunctionType _ = False
 
 -- | Lookup type in store, if not found, return NilType.
 --   For dot/proj, if table doesn't exist -> Never, or if key type doesn't match type key type.
@@ -180,17 +206,20 @@ synthParams env (FunctionType paramType returnType) (p : ps) =
     if checker env p paramType then synthParams env returnType ps else Never
 synthParams env _ _ = Never -- Shouldn't happen
 
-synthVal :: Value -> LType 
-synthVal NilVal = NilType
-synthVal (IntVal _) = IntType
-synthVal (BoolVal _) = BooleanType 
-synthVal (StringVal _) = StringType 
-synthVal (TableVal n) = undefined --what is this case? 
-synthVal (FunctionVal pms rt _) = synthFunc pms rt where 
-    synthFunc :: [Parameter] -> LType -> LType 
-    synthFunc [] rt = FunctionType NilType rt 
-    synthFunc [(_, t)] rt = FunctionType t rt
-    synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
+synthVal :: EnvironmentTypes -> Value -> LType 
+synthVal env NilVal = NilType
+synthVal env (IntVal _) = IntType
+synthVal env (BoolVal _) = BooleanType 
+synthVal env (StringVal _) = StringType 
+synthVal env (TableVal n) = undefined --what is this case? 
+synthVal env (FunctionVal pms rt b) = case S.evalState (typeCheckBlock b) env of 
+    Right () -> synthFunc pms rt
+    Left _ -> Never
+    where 
+        synthFunc :: [Parameter] -> LType -> LType 
+        synthFunc [] rt = FunctionType NilType rt 
+        synthFunc [(_, t)] rt = FunctionType t rt
+        synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
 
 synthOp1 :: EnvironmentTypes -> Uop -> Expression -> LType
 synthOp1 env Neg e = let eIsInt = checker env e IntType in 
@@ -234,7 +263,7 @@ synthComparisonOp env e1 e2 = if checkSameType env e1 e2
 -- | Determine type of a given expression with environment. 
 synthesis :: EnvironmentTypes -> Expression -> LType
 synthesis env (Var v) = getTypeFromEnv env v
-synthesis env (Val v) = synthVal v
+synthesis env (Val v) = synthVal env v
 synthesis env (Op1 uop exp) = synthOp1 env uop exp
 synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
 synthesis env (TableConst tfs) = synthTable env tfs  
