@@ -3,6 +3,7 @@ module LuTypeCheckerTest where
 import LuTypeChecker
 import LuSyntax
 import LuTypes
+import State qualified as S
 import Data.Map qualified as Map
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
@@ -280,8 +281,17 @@ test_synthesisCall =
                 synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType
             ]
 
+test_typeCheckStatement :: Test 
+test_typeCheckStatement = 
+    "typechecking statement" ~: 
+        TestList 
+            [
+                S.evalState (typeCheckStatement (Assign (Name "f",FunctionType IntType StringType) (Val (FunctionVal [("a",IntType)] StringType (Block [Return (Val (StringVal "here"))]))))) Map.empty ~?= Right ()
+            ]
+
+
 test :: IO Counts 
-test = runTestTT $ TestList [test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
+test = runTestTT $ TestList [test_typeCheckStatement, test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
 {-
 ===================================================================
 ================== TypeChecker: QuickCheck Tests ==================

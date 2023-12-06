@@ -37,6 +37,12 @@ type TypecheckerState = State EnvironmentTypes (Either String ())
 returnTypeName :: Name 
 returnTypeName = "@R"
 
+typeCheckAST :: Block -> Either String () 
+typeCheckAST b = S.evalState (typeCheckBlock b) Map.empty
+
+getTypeEnv :: Block -> EnvironmentTypes 
+getTypeEnv b = S.execState (typeCheckBlock b) Map.empty
+
 -- | typeCheck blocks in sequence (don't carry state from to the next)
 -- Note edge case where we don't want to carry type context from one if body to another. 
 typeCheckBlocks :: [Block] -> TypecheckerState
@@ -58,7 +64,11 @@ typeCheckCondtionalBlocks exp bs errorMsg = do
 
 -- | Given a block and an environment, check if the types are consistent in the block. 
 typeCheckBlock :: Block -> TypecheckerState
-typeCheckBlock (Block (s : ss)) = typeCheckStatement s >> typeCheckBlock (Block ss)
+typeCheckBlock (Block (s : ss)) = do 
+    curCheck <- typeCheckStatement s 
+    case curCheck of 
+        l@(Left _) -> return l 
+        Right () -> typeCheckBlock (Block ss)
 typeCheckBlock (Block []) = return $ Right ()
 
 -- | Given a statement and an environment, check if the types are consistent in the statement. 
@@ -81,16 +91,18 @@ typeCheckAssign v UnknownType exp = do
     s <- S.get 
     let tExp = synthesis s exp
     typeCheckAssign v tExp exp
+typeCheckAssign v Never exp = return $ Left "Can't assign to never type."
 typeCheckAssign v f@(FunctionType _ _) exp = do 
     s <- S.get 
     let oldReturnType = getTypeFromEnv s (Name "@R")
     let newReturnType = getFuncRType f 
     S.modify (Map.insert "@R" newReturnType)
-    let tExpType = synthesis s exp 
-    if not (tExpType <: f) 
-        then return $ Left "Invalid type assignment"
+    s2 <- S.get
+    let tExpType = synthesis s2 exp 
+    if not (tExpType <: f)
+        then return $ Left ("TypeAssignmentError: Cannot assign [" ++ pretty tExpType ++ "] to [" ++ pretty f ++ "].")
     else do
-        result <- doTypeAssignment s v f
+        result <- doTypeAssignment s2 v f
         S.modify (Map.insert "@R" oldReturnType)
         return result
 

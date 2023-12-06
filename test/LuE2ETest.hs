@@ -3,6 +3,7 @@ module LuE2ETest where
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
 import LuEvaluator (Store, eval, initialStore, resolveVar, index, globalTableName)
+import LuTypeChecker (typeCheckAST, getTypeEnv, EnvironmentTypes)
 import LuSyntax
 import State qualified as S
 import Data.Map qualified as Map
@@ -59,6 +60,22 @@ testFile fp checkFn = do
         Right True -> assert True 
         _ -> assert False
 
+typeCheckFile :: String -> Bool -> IO () 
+typeCheckFile fp flipped = do
+    parseResult <- parseLuFile fp 
+    case parseResult of 
+        (Left l) -> assert False
+        Right ast -> case typeCheckAST ast of 
+            (Left l) -> assert (not flipped)
+            _ -> assert flipped
+
+getTypeEnvFile :: String -> IO (Either String EnvironmentTypes)
+getTypeEnvFile fp = do 
+    parseResult <- parseLuFile fp 
+    case parseResult of 
+        (Left l) -> return $ Left l
+        Right ast -> return $ Right (getTypeEnv ast)
+
 test_if :: Test 
 test_if = 
     "e2e testing if" ~:
@@ -90,10 +107,27 @@ test_typeSig =
     "e2e typeSig" ~: 
         TestList 
             [
-                "typeSig" ~: testFile "test/lu/typeSig.lu" (checkVarValuesInStore [("x", IntVal 5), ("x2", IntVal 5), ("s", StringVal "hello"), ("s2", StringVal "hello"), ("z", BoolVal True), ("z2", BoolVal True)]), 
-                "typeSig2" ~: testFile "test/lu/typeSig2.lu" (checkVarExistsInStore "f" >> checkVarExistsInStore "u")
+                "optionalSig1" ~: testFile "test/lu/optionalSig1.lu" (checkVarValuesInStore [("x", IntVal 5), ("x2", IntVal 5), ("s", StringVal "hello"), ("s2", StringVal "hello"), ("z", BoolVal True), ("z2", BoolVal True)]), 
+                "optionalSig2" ~: testFile "test/lu/optionalSig2.lu" (checkVarExistsInStore "f" >> checkVarExistsInStore "u")
             ]
 
+test_typeCheck :: Test 
+test_typeCheck = 
+    "testing type checker" ~: 
+        TestList 
+            [
+                "abs" ~: typeCheckFile "test/lu/abs.lu" True, 
+                "exp" ~: typeCheckFile "test/lu/exp.lu" False, 
+                "fact" ~: typeCheckFile "test/lu/fact.lu" True, 
+                "repeat" ~: typeCheckFile "test/lu/repeat.lu" True, 
+                "table" ~: typeCheckFile "test/lu/table.lu" False, 
+                "test" ~: typeCheckFile "test/lu/test.lu" True, 
+                "bfs" ~: typeCheckFile "test/lu/bfs.lu" False, 
+                "times" ~: typeCheckFile "test/lu/times.lu" True, 
+                "optionalSig1" ~: typeCheckFile "test/lu/optionalSig1.lu" True, 
+                "optionalSig2" ~: typeCheckFile "test/lu/optionalSig2.lu" True, 
+                "recFunction" ~: typeCheckFile "test/lu/recFunction.lu" True
+            ]
 
 test :: IO Counts 
-test = runTestTT $ TestList [test_if, test_function, test_typeSig]
+test = runTestTT $ TestList [test_typeCheck, test_if, test_function, test_typeSig]
