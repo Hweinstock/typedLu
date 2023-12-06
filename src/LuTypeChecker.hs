@@ -3,6 +3,7 @@ module LuTypeChecker where
 import Control.Monad
 import LuSyntax
 import State (State)
+import qualified State as S
 import Data.Map (Map)
 import Data.List (nub)
 import qualified Data.Map as Map
@@ -33,13 +34,87 @@ type EnvironmentTypes = Map Name LType
 
 type TypecheckerState = State EnvironmentTypes (Either String ())
 
+-- | typeCheck blocks in sequence (don't carry state from to the next)
+-- Note edge case where we don't want to carry type context from one if body to another. 
+typeCheckBlocks :: [Block] -> TypecheckerState
+typeCheckBlocks = foldr helper (return $ Right ()) where 
+    helper :: Block -> TypecheckerState -> TypecheckerState
+    helper b ts = do 
+        res <- ts 
+        case res of 
+            l@(Left _) -> return l 
+            (Right _) -> typeCheckBlock b
+    
+-- | Check that given expression is boolean, then check underlying blocks.
+typeCheckCondtionalBlocks :: Expression -> [Block] -> String -> TypecheckerState
+typeCheckCondtionalBlocks exp bs errorMsg = do 
+    curStore <- S.get 
+    if not (checker curStore exp BooleanType) 
+        then return $ Left errorMsg
+        else typeCheckBlocks bs
+
 -- | Given a block and an environment, check if the types are consistent in the block. 
 typeCheckBlock :: Block -> TypecheckerState
-typeCheckBlock = undefined
+typeCheckBlock (Block (s : ss)) = typeCheckStatement s >> typeCheckBlock (Block ss)
+typeCheckBlock (Block []) = return $ Right ()
 
 -- | Given a statement and an environment, check if the types are consistent in the statement. 
 typeCheckStatement :: Statement -> TypecheckerState
-typeCheckStatement = undefined
+typeCheckStatement (Assign (v, t) exp) = typeCheckAssign v t exp
+typeCheckStatement (If exp b1 b2) = typeCheckCondtionalBlocks exp [b1, b2] "Non-boolean in if condition"
+typeCheckStatement (While exp b) = typeCheckCondtionalBlocks exp [b] "Non-boolean in while condition"
+typeCheckStatement Empty = return $ Right ()  
+typeCheckStatement (Repeat b exp) = typeCheckCondtionalBlocks exp [b] "Non-boolean in repeat condition"
+typeCheckStatement (Return exp) = undefined 
+
+typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState
+typeCheckAssign v UnknownType exp = do 
+    s <- S.get 
+    let tExp = synthesis s exp
+    typeCheckAssign v tExp exp 
+typeCheckAssign (Name n) t tExp = do 
+    s <- S.get 
+    let tExpType = synthesis s tExp
+    if not (isTypeInstanceOf tExpType t) then 
+        return $ Left "Invalid type assignment"
+    else 
+        case getTypeFromEnv s (Name n) of 
+            NilType -> updateTypeEnv n tExpType
+            Never -> return $ Left "Unable to determine type of expression in assignment"
+            realT -> if realT /= tExpType then 
+                return $ Left "Cannot redefine variable to new type"
+                else updateTypeEnv n tExpType
+typeCheckAssign (Dot tExp n) t vExp = do 
+    s <- S.get 
+    let vExpType = synthesis s vExp 
+    let tExpType = synthesis s tExp
+    return $ if not (isTypeInstanceOf vExpType t) then 
+        Left "Invalid type assignment"
+    else 
+        typecheckTableAccess tExpType StringType vExpType
+typeCheckAssign (Proj tExp kExp) t vExp = do 
+    s <- S.get 
+    let vExpType = synthesis s vExp 
+    let kExpType = synthesis s kExp 
+    let tExpType = synthesis s tExp
+    return $ if not (isTypeInstanceOf vExpType t) then 
+        Left "Invalid type assignment"
+    else 
+        typecheckTableAccess tExpType kExpType vExpType
+
+typecheckTableAccess :: LType -> LType -> LType -> Either String ()
+typecheckTableAccess (TableType kType vType) givenKType givenVType = 
+    if isTypeInstanceOf givenKType kType && isTypeInstanceOf givenVType vType 
+        then Right () 
+        else Left "Table type sealed"
+typecheckTableAccess _ _ _= Left "Unable to access value from non-table"
+
+-- | Update variable type in store. 
+updateTypeEnv :: Name -> LType -> TypecheckerState
+updateTypeEnv n t = do 
+    env <- S.get
+    S.modify (Map.insert n t)
+    return $ Right ()
 
 -- | Lookup type in store, if not found, return NilType.
 --   For dot/proj, if table doesn't exist -> Never, or if key type doesn't match type key type.
@@ -66,6 +141,7 @@ isTypeInstanceOf a Never = False
 isTypeInstanceOf a AnyType = True 
 isTypeInstanceOf (UnionType a1 a2) b = isTypeInstanceOf a1 b && isTypeInstanceOf a2 b
 isTypeInstanceOf a (UnionType t1 t2) = isTypeInstanceOf a t1 || isTypeInstanceOf a t2
+isTypeInstanceOf (TableType t1 t2) (TableType t3 t4) = isTypeInstanceOf t1 t3 && isTypeInstanceOf t2 t4
 isTypeInstanceOf _ _ = False
 
 checkSameType :: EnvironmentTypes -> Expression -> Expression -> Bool 
