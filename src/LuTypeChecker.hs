@@ -35,6 +35,14 @@ type EnvironmentTypes = Map Name LType
 type TypecheckerState = State EnvironmentTypes (Either String ())
 type SynthesisState = State EnvironmentTypes LType
 
+class Synthable a where
+    synth :: a -> LType 
+
+instance Synthable Uop where 
+    synth Neg = FunctionType IntType IntType
+    synth Not = FunctionType AnyType BooleanType 
+    synth Len = FunctionType (UnionType IntType (UnionType StringType (TableType AnyType AnyType))) IntType  
+
 returnTypeName :: Name 
 returnTypeName = "@R"
 
@@ -230,16 +238,7 @@ synthVal env (FunctionVal pms rt b) =
             addToEnv (k, v) = Map.insert k v
 
 synthOp1 :: EnvironmentTypes -> Uop -> Expression -> LType
-synthOp1 env Neg e = let eIsInt = checker env e IntType in 
-    if eIsInt then IntType else UnknownType
-synthOp1 env Not e = BooleanType 
-synthOp1 env Len e = let eType = synthesis env e in 
-    if isValidLenType eType then IntType else UnknownType where 
-        isValidLenType :: LType -> Bool 
-        isValidLenType StringType = True 
-        isValidLenType IntType = True 
-        isValidLenType (TableType _ _) = True 
-        isValidLenType _ = False 
+synthOp1 env op e = synthParams env (synth op) [e]
 
 arithmeticOpType :: LType
 arithmeticOpType = FunctionType IntType (FunctionType IntType IntType)
@@ -272,7 +271,7 @@ synthComparisonOp env e1 e2 = if checkSameType env e1 e2
 synthesis :: EnvironmentTypes -> Expression -> LType
 synthesis env (Var v) = getTypeFromEnv env v
 synthesis env (Val v) = synthVal env v
-synthesis env (Op1 uop exp) = synthOp1 env uop exp
+synthesis env (Op1 uop exp) = synthParams env (synth uop) [exp]
 synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
 synthesis env (TableConst tfs) = synthTable env tfs  
 synthesis env (Call v pms) = synthCall env v pms 

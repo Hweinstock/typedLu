@@ -220,7 +220,9 @@ test_synthesisOp1 =
                 synthesis store (Op1 Not (Var (Name "boolean"))) ~?= BooleanType,
                 synthesis store (Op1 Not (Var (Name "int"))) ~?= BooleanType,
                 synthesis store (Op1 Len (Var (Name "string"))) ~?= IntType,
-                synthesis store (Op1 Len (Var (Name "int"))) ~?= IntType
+                synthesis store (Op1 Len (Var (Name "int"))) ~?= IntType, 
+                synthesis store (Op1 Len (Var (Name "table1"))) ~?= IntType, 
+                synthesis store (Op1 Len (Var (Name "table2"))) ~?= IntType
             ]
 
 -- Test synthesis function with Op2 as input
