@@ -29,14 +29,20 @@ instance Monad m => Applicative (EitherT m) where
 instance Monad m => Functor (EitherT m) where
     fmap = liftM
 
-type EnvironmentTypes = Map Name LType
+data Environment = Environment {
+    typeMap :: Map Name LType,
+    functionMap :: Map Name Value
+}
+
+addTypeToEnv :: (Name, LType) -> Environment -> Environment
+addTypeToEnv (k, v) env = env {typeMap = Map.insert k v (typeMap env)}
 -- type TypecheckerState = EitherT (State EnvironmentTypes) ()  -- transformer version
 
-type TypecheckerState = State EnvironmentTypes (Either String ())
-type SynthesisState = State EnvironmentTypes LType
+type TypecheckerState = State Environment (Either String ())
+type SynthesisState = State Environment LType
 
 class Synthable a where
-    synth :: EnvironmentTypes -> a -> LType 
+    synth :: Environment -> a -> LType 
 
 instance Synthable Uop where 
     synth _ Neg = FunctionType IntType IntType
@@ -73,16 +79,14 @@ instance Synthable Value where
             synthFunc [(_, t)] rt = FunctionType t rt
             synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
 
-            prepareFunctionEnv :: [Parameter] -> LType -> EnvironmentTypes 
-            prepareFunctionEnv pms rt = foldr addToEnv env (("@R", rt) : pms) where 
-                addToEnv :: (Name, LType) -> EnvironmentTypes -> EnvironmentTypes
-                addToEnv (k, v) = Map.insert k v
+            prepareFunctionEnv :: [Parameter] -> LType -> Environment 
+            prepareFunctionEnv pms rt = foldr addTypeToEnv env (("@R", rt) : pms) 
 
 instance Synthable [TableField] where 
     synth env tfs = let (keyTypes, valTypes) = unzip (map (synthTableField env) tfs) in 
         TableType (constructType keyTypes) (constructType valTypes) 
         where 
-            synthTableField :: EnvironmentTypes -> TableField -> (LType, LType)
+            synthTableField :: Environment -> TableField -> (LType, LType)
             synthTableField env (FieldName n e) = synthTableField env (FieldKey (Val (StringVal n)) e) -- If fieldName, treat it as a string indexer.
             synthTableField env (FieldKey e1 e2) = (synthesis env e1, synthesis env e2) 
 
@@ -97,7 +101,7 @@ instance Synthable [TableField] where
 -- | Lookup type in store, if not found, return NilType.
 --   For dot/proj, if table doesn't exist -> Unknown, or if key type doesn't match expected key type.
 instance Synthable Var where 
-    synth env (Name n) = case Map.lookup n env of 
+    synth env (Name n) = case Map.lookup n (typeMap env) of 
         Just t -> t 
         _ -> NilType
     synth env (Dot exp n) = let tExp = synthesis env exp in 
@@ -122,11 +126,14 @@ isPolymorphicBop _ = False
 returnTypeName :: Name 
 returnTypeName = "@R"
 
-typeCheckAST :: Block -> Either String () 
-typeCheckAST b = S.evalState (typeCheckBlock b) Map.empty
+emptyStore :: Environment 
+emptyStore = Environment {typeMap = Map.empty, functionMap = Map.empty}
 
-getTypeEnv :: Block -> Either String EnvironmentTypes 
-getTypeEnv b = case S.runState (typeCheckBlock b) Map.empty of 
+typeCheckAST :: Block -> Either String () 
+typeCheckAST b = S.evalState (typeCheckBlock b) emptyStore
+
+getTypeEnv :: Block -> Either String Environment 
+getTypeEnv b = case S.runState (typeCheckBlock b) emptyStore of 
     (Right (), finalStore) -> Right finalStore
     (Left l, finalStore) -> Left l
     
@@ -136,7 +143,7 @@ errorMsg errorType expectedType actualType =
     errorType ++ ": expected type [" ++ pretty expectedType ++ "] got type [" ++ pretty actualType ++ "]" 
 
 -- | typeCheck blocks individually, with some state. 
-typeCheckBlocks :: EnvironmentTypes -> [Block] -> Either String ()
+typeCheckBlocks :: Environment -> [Block] -> Either String ()
 typeCheckBlocks env = foldr checkBlock (Right ()) where 
     checkBlock :: Block -> Either String () -> Either String () 
     checkBlock b l@(Left _) = l 
@@ -187,7 +194,7 @@ typeCheckAssign v t exp = do
         return $ Left (errorMsg "AssignmentError" t tExpType)
     else doTypeAssignment s v t 
     
-doTypeAssignment :: EnvironmentTypes -> Var -> LType -> TypecheckerState
+doTypeAssignment :: Environment -> Var -> LType -> TypecheckerState
 doTypeAssignment s (Name n) tExpType = do 
     case synth s (Name n) of 
         NilType -> updateTypeEnv n tExpType
@@ -214,7 +221,7 @@ typecheckTableAccess _ _ _= Left "Unable to access value from non-table"
 updateTypeEnv :: Name -> LType -> TypecheckerState
 updateTypeEnv n t = do 
     env <- S.get
-    S.modify (Map.insert n t)
+    S.modify (addTypeToEnv (n, t))
     return $ Right ()
 
 -- | IsSubtype: Return true if first type is valid subtype of the second. 
@@ -231,13 +238,13 @@ updateTypeEnv n t = do
 (<:) (FunctionType t1 t2) (FunctionType t3 t4) = t3 <: t1 && t2 <: t4
 (<:) _ _ = False
 
-checkSameType :: EnvironmentTypes -> Expression -> Expression -> Bool 
+checkSameType :: Environment -> Expression -> Expression -> Bool 
 checkSameType env e1 e2 = t1 <: t2 && t2 <: t1 where 
     t1 = synthesis env e1
     t2 = synthesis env e2
 
 -- | Generalized function to typecheck parameters for any function type. 
-synthParams :: EnvironmentTypes -> LType -> [Expression] -> LType 
+synthParams :: Environment -> LType -> [Expression] -> LType 
 synthParams env (FunctionType Never returnType) [] = returnType
 synthParams env (FunctionType paramType returnType) [p] = 
     if checker env p paramType then returnType else UnknownType
@@ -245,14 +252,14 @@ synthParams env (FunctionType paramType returnType) (p : ps) =
     if checker env p paramType then synthParams env returnType ps else UnknownType
 synthParams env _ _ = UnknownType -- Attempt to call non-function type. 
 
-synthOp2 :: EnvironmentTypes -> Bop -> Expression -> Expression -> LType                            
+synthOp2 :: Environment -> Bop -> Expression -> Expression -> LType                            
 synthOp2 env op e1 e2 | isPolymorphicBop op = if checkSameType env e1 e2 
     then synthParams env (synth env op) [e1, e2]
     else UnknownType -- not same type, can't compare
 synthOp2 env op e1 e2 = synthParams env (synth env op) [e1, e2]
 
 -- | Determine type of a given expression with environment. 
-synthesis :: EnvironmentTypes -> Expression -> LType
+synthesis :: Environment -> Expression -> LType
 synthesis env (Op1 uop exp) = synthParams env (synth env uop) [exp]
 synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
 synthesis env (Call v pms) = synthParams env (synthesis env (Var v)) pms
@@ -260,12 +267,12 @@ synthesis env (Val v) = synth env v
 synthesis env (Var v) = synth env v
 synthesis env (TableConst tfs) = synth env tfs  
 
-synthesisWithState :: Expression -> SynthesisState 
+synthesisWithState :: Expression -> SynthesisState  
 synthesisWithState exp = do
     s <- S.get 
     return $ synthesis s exp 
 
 -- | Check that type of given expression is an instance of given type. 
-checker :: EnvironmentTypes -> Expression -> LType -> Bool
+checker :: Environment -> Expression -> LType -> Bool
 checker env e = (<:) (synthesis env e)
 

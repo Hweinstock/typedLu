@@ -3,7 +3,7 @@ module LuE2ETest where
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
 import LuEvaluator (Store, eval, initialStore, resolveVar, index, globalTableName)
-import LuTypeChecker (typeCheckAST, getTypeEnv, EnvironmentTypes)
+import LuTypeChecker (typeCheckAST, getTypeEnv, Environment)
 import LuSyntax
 import State qualified as S
 import Data.Map qualified as Map
@@ -69,7 +69,7 @@ typeCheckFile fp flipped = do
             (Left l) -> assert (not flipped)
             _ -> assert flipped
 
-getTypeEnvFile :: String -> IO (Either String EnvironmentTypes)
+getTypeEnvFile :: String -> IO (Either String Environment)
 getTypeEnvFile fp = do 
     parseResult <- parseLuFile fp 
     case parseResult of 
@@ -78,12 +78,12 @@ getTypeEnvFile fp = do
             (Left l2) -> return $ Left l2
             Right store -> return $ Right store
 
-showTypeEnvFile :: String -> IO () 
-showTypeEnvFile fp = do 
-    res <- getTypeEnvFile fp 
-    case res of 
-        Left l -> putStrLn l 
-        Right s -> putStrLn (show s)
+-- showTypeEnvFile :: String -> IO () 
+-- showTypeEnvFile fp = do 
+--     res <- getTypeEnvFile fp 
+--     case res of 
+--         Left l -> putStrLn l 
+--         Right s -> putStrLn (show s)
 
 test_if :: Test 
 test_if = 

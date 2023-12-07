@@ -9,9 +9,9 @@ import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import LuEvaluator (Store)
 
-store :: EnvironmentTypes
-store  = 
-  Map.fromList
+store :: Environment
+store  = Environment {typeMap = typeMap, functionMap = Map.empty} where 
+  typeMap = Map.fromList
     [ ("int", IntType),
       ("string", StringType),
       ("boolean", BooleanType),
@@ -287,7 +287,7 @@ test_synthesisCall =
                 synthesis store (Call (Name "function1") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
                 synthesis store (Call (Name "function0") []) ~?= StringType, 
                 synthesis store (Call (Name "function0") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
-                synthesis store (Call (Name "function0") [Val NilVal]) ~?= UnknownType
+                synthesis store (Call (Name "function0") [Val NilVal]) ~?= UnknownType 
             ]
 
 test_typeCheckStatement :: Test 
@@ -295,7 +295,7 @@ test_typeCheckStatement =
     "typechecking statement" ~: 
         TestList 
             [
-                S.evalState (typeCheckStatement (Assign (Name "f",FunctionType IntType StringType) (Val (FunctionVal [("a",IntType)] StringType (Block [Return (Val (StringVal "here"))]))))) Map.empty ~?= Right ()
+                S.evalState (typeCheckStatement (Assign (Name "f",FunctionType IntType StringType) (Val (FunctionVal [("a",IntType)] StringType (Block [Return (Val (StringVal "here"))]))))) emptyStore ~?= Right ()
             ]
 
 
