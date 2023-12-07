@@ -242,22 +242,18 @@ getFuncRType _ = UnknownType -- Should never hit this case.
 
 getFuncParamTypes :: LType -> [LType]
 getFuncParamTypes (FunctionType t f@(FunctionType _ _ )) = t : getFuncParamTypes f 
-getFuncParamTypes (FunctionType NilType _) = []
+getFuncParamTypes (FunctionType Never _) = []
 getFuncParamTypes (FunctionType t _) = [t]
 getFuncParamTypes _ = [] -- Should never hit this case. 
 
-synthCall :: EnvironmentTypes -> Var -> [Expression] -> LType
-synthCall env v = synthParams env (synthesis env (Var v))
-
 -- | Generalized function to typecheck parameters for any function type. 
 synthParams :: EnvironmentTypes -> LType -> [Expression] -> LType 
-synthParams env (FunctionType NilType returnType) [] = returnType
-synthParams env (FunctionType paramType (FunctionType _ _)) [p] = UnknownType -- Not enough arguments
+synthParams env (FunctionType Never returnType) [] = returnType
 synthParams env (FunctionType paramType returnType) [p] = 
     if checker env p paramType then returnType else UnknownType
 synthParams env (FunctionType paramType returnType) (p : ps) = 
     if checker env p paramType then synthParams env returnType ps else UnknownType
-synthParams env _ _ = UnknownType -- Shouldn't happen
+synthParams env _ _ = UnknownType -- Attempt to call non-function type. 
 
 synthOp2 :: EnvironmentTypes -> Bop -> Expression -> Expression -> LType                            
 synthOp2 env op e1 e2 | isPolymorphicBop op = if checkSameType env e1 e2 
@@ -269,7 +265,7 @@ synthOp2 env op e1 e2 = synthParams env (synth env op) [e1, e2]
 synthesis :: EnvironmentTypes -> Expression -> LType
 synthesis env (Op1 uop exp) = synthParams env (synth env uop) [exp]
 synthesis env (Op2 exp1 bop exp2) = synthOp2 env bop exp1 exp2
-synthesis env (Call v pms) = synthCall env v pms 
+synthesis env (Call v pms) = synthParams env (synthesis env (Var v)) pms
 synthesis env (Val v) = synth env v
 synthesis env (Var v) = synth env v
 synthesis env (TableConst tfs) = synth env tfs  

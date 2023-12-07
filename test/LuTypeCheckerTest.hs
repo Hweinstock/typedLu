@@ -19,6 +19,7 @@ store  =
       ("table1", TableType StringType BooleanType),
       ("table2", TableType StringType IntType),
       ("table3", TableType BooleanType BooleanType),
+      ("function0", FunctionType Never StringType),
       ("function1", FunctionType IntType StringType),
       ("function2", FunctionType StringType StringType),
       ("function3", FunctionType IntType IntType),
@@ -281,7 +282,12 @@ test_synthesisCall =
                 synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType,
                 synthesis store (Call (Name "function4") [Var (Name "string")]) ~?= UnknownType, 
                 synthesis store (Call (Name "function4") [Var (Name "boolean")]) ~?= UnknownType, 
-                synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType
+                synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType, 
+                synthesis store (Call (Name "function1") []) ~?= UnknownType, 
+                synthesis store (Call (Name "function1") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
+                synthesis store (Call (Name "function0") []) ~?= StringType, 
+                synthesis store (Call (Name "function0") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
+                synthesis store (Call (Name "function0") [Val NilVal]) ~?= UnknownType
             ]
 
 test_typeCheckStatement :: Test 
