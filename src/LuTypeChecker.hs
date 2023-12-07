@@ -69,9 +69,10 @@ instance Synthable Value where
         Left _ -> UnknownType
         where 
             synthFunc :: [Parameter] -> LType -> LType 
-            synthFunc [] rt = FunctionType NilType rt 
+            synthFunc [] rt = FunctionType Never rt 
             synthFunc [(_, t)] rt = FunctionType t rt
             synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
+
             prepareFunctionEnv :: [Parameter] -> LType -> EnvironmentTypes 
             prepareFunctionEnv pms rt = foldr addToEnv env (("@R", rt) : pms) where 
                 addToEnv :: (Name, LType) -> EnvironmentTypes -> EnvironmentTypes
@@ -234,17 +235,6 @@ checkSameType :: EnvironmentTypes -> Expression -> Expression -> Bool
 checkSameType env e1 e2 = t1 <: t2 && t2 <: t1 where 
     t1 = synthesis env e1
     t2 = synthesis env e2
-
-getFuncRType :: LType -> LType 
-getFuncRType (FunctionType _ f@(FunctionType _ _)) = getFuncRType f
-getFuncRType (FunctionType _ r) = r 
-getFuncRType _ = UnknownType -- Should never hit this case. 
-
-getFuncParamTypes :: LType -> [LType]
-getFuncParamTypes (FunctionType t f@(FunctionType _ _ )) = t : getFuncParamTypes f 
-getFuncParamTypes (FunctionType Never _) = []
-getFuncParamTypes (FunctionType t _) = [t]
-getFuncParamTypes _ = [] -- Should never hit this case. 
 
 -- | Generalized function to typecheck parameters for any function type. 
 synthParams :: EnvironmentTypes -> LType -> [Expression] -> LType 
