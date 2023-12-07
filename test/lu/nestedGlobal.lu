@@ -1,0 +1,5 @@
+function foo(x: int) : int 
+    z = 10 
+    return x 
+
+result = z + foo(10)

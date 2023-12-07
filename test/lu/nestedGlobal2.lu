@@ -1,0 +1,7 @@
+function foo(x : int) : int 
+    z = 5 
+    return x 
+end 
+
+x = foo(3)
+result = x + z

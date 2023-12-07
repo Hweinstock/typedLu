@@ -145,7 +145,9 @@ test_typeCheck =
                 "function7" ~: typeCheckFile "test/lu/function7.lu" True, 
                 "function8" ~: typeCheckFile "test/lu/function8.lu" True, 
                 "unionTypeFunc" ~: typeCheckFile "test/lu/unionTypeFunc.lu" False, 
-                "weirdScopesFunc" ~: typeCheckFile "test/lu/weirdScopesFunc.lu" True
+                "weirdScopesFunc" ~: typeCheckFile "test/lu/weirdScopesFunc.lu" True, 
+                "nestedGlobal" ~: typeCheckFile "test/lu/nestedGlobal.lu" False, 
+                "nestedGlobal2" ~: typeCheckFile "test/lu/nestedGlobal2.lu" True
             ]
 
 test :: IO Counts 
