@@ -91,17 +91,17 @@ var :: String -> Expression
 var = Var . Name
 
 -- | Helper function to hash value data types. 
-hashV :: Value -> Int 
-hashV NilVal = hash "NilVal"
-hashV (IntVal i) = hash i
-hashV (BoolVal b) = hash b
-hashV (StringVal s) = hash s 
-hashV (TableVal n) = hash $ "table" ++ n 
-hashV (FunctionVal ps rt b) = hash (show ps ++ show rt ++ show b)
+hashVal :: Value -> Int 
+hashVal NilVal = hash "NilVal"
+hashVal (IntVal i) = hash i
+hashVal (BoolVal b) = hash b
+hashVal (StringVal s) = hash s 
+hashVal (TableVal n) = hash $ "table" ++ n 
+hashVal (FunctionVal ps rt b) = hash (show ps ++ show rt ++ show b)
 
 -- | Implement custom Ord via hasing since function values make deriving Ord difficult. 
 instance Ord Value where 
-  v1 `compare` v2 = hashV v1 `compare` hashV v2
+  v1 `compare` v2 = hashVal v1 `compare` hashVal v2
 
 -- test.lu
 wTest :: Block

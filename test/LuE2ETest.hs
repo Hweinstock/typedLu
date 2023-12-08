@@ -93,6 +93,15 @@ getTypeEnvFile fp = do
             (Left l2) -> return $ Left l2
             Right store -> return $ Right store
 
+seeTypeStore :: String -> IO () 
+seeTypeStore fp = do 
+    r <- getTypeEnvFile fp 
+    case r of 
+        Left l -> putStrLn (show l )
+        Right r -> putStrLn (show (typeMap r) )
+
+
+
 testEvalFile :: String -> (Store -> Either String Bool) -> IO () 
 testEvalFile fp checkFn = do 
     res <- checkFileOutputStore fp checkFn
@@ -185,8 +194,8 @@ test_typeCheckStore =
         TestList 
             [
                 "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (containsFunc "foo"), 
-                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (missingType "z" True),
-                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (missingType "z" False)
+                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (inTypeMap "z" False),
+                "calledFunc" ~: testTypeCheckFileStore "test/lu/calledFunc.lu" (inTypeMap "z" True)
 
             ] where 
                 containsFunc :: Name -> Environment -> Either String Bool 
@@ -194,10 +203,10 @@ test_typeCheckStore =
                     Just _ -> return True 
                     _ -> Left "Failed to find"
 
-                missingType :: Name -> Bool -> Environment -> Either String Bool 
-                missingType n flipped env = case Map.lookup n (typeMap env) of 
-                    Just _ -> return flipped 
-                    _ -> return flipped
+                inTypeMap :: Name -> Bool -> Environment -> Either String Bool 
+                inTypeMap n expected env = case Map.lookup n (typeMap env) of 
+                    Just _ -> return expected 
+                    _ -> return (not expected)
 
 test :: IO Counts 
 test = runTestTT $ TestList [test_typeCheckStore, test_typeCheck, test_if, test_function, test_typeSig]

@@ -188,13 +188,13 @@ test_synthesisVar =
     "synthesis Var" ~:
         TestList
             [ 
-                synthesis store (Var (Name "int")) ~?= IntType,
-                synthesis store (Var (Name "string")) ~?= StringType,
-                synthesis store (Var (Name "boolean")) ~?= BooleanType,
-                synthesis store (Var (Name "table1")) ~?= TableType StringType BooleanType,
-                synthesis store (Var (Name "function1")) ~?= FunctionType IntType StringType,
-                synthesis store (Var (Name "function4")) ~?= FunctionType IntType (UnionType IntType StringType), 
-                synthesis store (Var (Dot (Var (Name "table1")) "n")) ~?= BooleanType
+                runSynthesis store (Var (Name "int")) ~?= IntType,
+                runSynthesis store (Var (Name "string")) ~?= StringType,
+                runSynthesis store (Var (Name "boolean")) ~?= BooleanType,
+                runSynthesis store (Var (Name "table1")) ~?= TableType StringType BooleanType,
+                runSynthesis store (Var (Name "function1")) ~?= FunctionType IntType StringType,
+                runSynthesis store (Var (Name "function4")) ~?= FunctionType IntType (UnionType IntType StringType), 
+                runSynthesis store (Var (Dot (Var (Name "table1")) "n")) ~?= BooleanType
             ]
 
 -- Test synthesis function with Val as input
@@ -203,11 +203,11 @@ test_synthesisVal =
     "synthesis Val" ~:
         TestList
             [ 
-                synthesis store (Val (IntVal 0)) ~?= IntType,
-                synthesis store (Val (StringVal "")) ~?= StringType,
-                synthesis store (Val (BoolVal True)) ~?= BooleanType,
-                synthesis store (Val (FunctionVal [("x", IntType)] StringType (Block []))) ~?= FunctionType IntType StringType, 
-                synthesis store (Val (FunctionVal [("a",IntType)] StringType (Block [Return (Val (StringVal "here"))]))) ~?= FunctionType IntType StringType
+                runSynthesis store (Val (IntVal 0)) ~?= IntType,
+                runSynthesis store (Val (StringVal "")) ~?= StringType,
+                runSynthesis store (Val (BoolVal True)) ~?= BooleanType,
+                runSynthesis store (Val (FunctionVal [("x", IntType)] StringType (Block []))) ~?= FunctionType IntType StringType, 
+                runSynthesis store (Val (FunctionVal [("a",IntType)] StringType (Block [Return (Val (StringVal "here"))]))) ~?= FunctionType IntType StringType
             ]
 
 -- Test synthesis function with Op1 as input
@@ -216,14 +216,14 @@ test_synthesisOp1 =
     "synthesis Op1" ~:
         TestList
             [ 
-                synthesis store (Op1 Neg (Var (Name "int"))) ~?= IntType,
-                synthesis store (Op1 Neg (Var (Name "string"))) ~?= UnknownType,
-                synthesis store (Op1 Not (Var (Name "boolean"))) ~?= BooleanType,
-                synthesis store (Op1 Not (Var (Name "int"))) ~?= BooleanType,
-                synthesis store (Op1 Len (Var (Name "string"))) ~?= IntType,
-                synthesis store (Op1 Len (Var (Name "int"))) ~?= IntType, 
-                synthesis store (Op1 Len (Var (Name "table1"))) ~?= IntType, 
-                synthesis store (Op1 Len (Var (Name "table2"))) ~?= IntType
+                runSynthesis store (Op1 Neg (Var (Name "int"))) ~?= IntType,
+                runSynthesis store (Op1 Neg (Var (Name "string"))) ~?= UnknownType,
+                runSynthesis store (Op1 Not (Var (Name "boolean"))) ~?= BooleanType,
+                runSynthesis store (Op1 Not (Var (Name "int"))) ~?= BooleanType,
+                runSynthesis store (Op1 Len (Var (Name "string"))) ~?= IntType,
+                runSynthesis store (Op1 Len (Var (Name "int"))) ~?= IntType, 
+                runSynthesis store (Op1 Len (Var (Name "table1"))) ~?= IntType, 
+                runSynthesis store (Op1 Len (Var (Name "table2"))) ~?= IntType
             ]
 
 -- Test synthesis function with Op2 as input
@@ -232,28 +232,28 @@ test_synthesisOp2 =
     "synthesis Op2" ~:
         TestList
             [ 
-                synthesis store (Op2 (Var (Name "int")) Plus (Var (Name "int"))) ~?= IntType,
-                synthesis store (Op2 (Var (Name "string")) Plus (Var (Name "int"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "int")) Minus (Var (Name "int"))) ~?= IntType,
-                synthesis store (Op2 (Var (Name "boolean")) Minus (Var (Name "int"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "int")) Times (Var (Name "int"))) ~?= IntType,
-                synthesis store (Op2 (Var (Name "string")) Times (Var (Name "int"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "int")) Divide (Var (Name "int"))) ~?= IntType,
-                synthesis store (Op2 (Var (Name "boolean")) Divide (Var (Name "int"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "int")) Modulo (Var (Name "int"))) ~?= IntType,
-                synthesis store (Op2 (Var (Name "string")) Modulo (Var (Name "int"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "int")) Eq (Var (Name "int"))) ~?= BooleanType,
-                synthesis store (Op2 (Var (Name "int")) Eq (Var (Name "string"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "string")) Gt (Var (Name "string"))) ~?= BooleanType,
-                synthesis store (Op2 (Var (Name "string")) Gt (Var (Name "boolean"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "boolean")) Ge (Var (Name "boolean"))) ~?= BooleanType,
-                synthesis store (Op2 (Var (Name "boolean")) Ge (Var (Name "int"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "string")) Lt (Var (Name "string"))) ~?= BooleanType,
-                synthesis store (Op2 (Var (Name "string")) Lt (Var (Name "int"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "boolean")) Le (Var (Name "boolean"))) ~?= BooleanType,
-                synthesis store (Op2 (Var (Name "boolean")) Le (Var (Name "string"))) ~?= UnknownType,
-                synthesis store (Op2 (Var (Name "string")) Concat (Var (Name "string"))) ~?= StringType,
-                synthesis store (Op2 (Var (Name "string")) Concat (Var (Name "int"))) ~?= UnknownType
+                runSynthesis store (Op2 (Var (Name "int")) Plus (Var (Name "int"))) ~?= IntType,
+                runSynthesis store (Op2 (Var (Name "string")) Plus (Var (Name "int"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "int")) Minus (Var (Name "int"))) ~?= IntType,
+                runSynthesis store (Op2 (Var (Name "boolean")) Minus (Var (Name "int"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "int")) Times (Var (Name "int"))) ~?= IntType,
+                runSynthesis store (Op2 (Var (Name "string")) Times (Var (Name "int"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "int")) Divide (Var (Name "int"))) ~?= IntType,
+                runSynthesis store (Op2 (Var (Name "boolean")) Divide (Var (Name "int"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "int")) Modulo (Var (Name "int"))) ~?= IntType,
+                runSynthesis store (Op2 (Var (Name "string")) Modulo (Var (Name "int"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "int")) Eq (Var (Name "int"))) ~?= BooleanType,
+                runSynthesis store (Op2 (Var (Name "int")) Eq (Var (Name "string"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "string")) Gt (Var (Name "string"))) ~?= BooleanType,
+                runSynthesis store (Op2 (Var (Name "string")) Gt (Var (Name "boolean"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "boolean")) Ge (Var (Name "boolean"))) ~?= BooleanType,
+                runSynthesis store (Op2 (Var (Name "boolean")) Ge (Var (Name "int"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "string")) Lt (Var (Name "string"))) ~?= BooleanType,
+                runSynthesis store (Op2 (Var (Name "string")) Lt (Var (Name "int"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "boolean")) Le (Var (Name "boolean"))) ~?= BooleanType,
+                runSynthesis store (Op2 (Var (Name "boolean")) Le (Var (Name "string"))) ~?= UnknownType,
+                runSynthesis store (Op2 (Var (Name "string")) Concat (Var (Name "string"))) ~?= StringType,
+                runSynthesis store (Op2 (Var (Name "string")) Concat (Var (Name "int"))) ~?= UnknownType
             ]
 
 -- Test synthesis function with TableConst as input
@@ -262,12 +262,12 @@ test_synthesisTableConst =
     "synthesis TableConst" ~:
         TestList
             [ 
-                synthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "int"))]) ~?= TableType StringType IntType,
-                synthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
-                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) ~?= TableType StringType IntType,
-                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
-                synthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) ~?= TableType (UnionType StringType IntType) IntType, 
-                synthesis store (TableConst [FieldKey (Var (Name "int-or-string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) ~?= TableType (UnionType IntType StringType) IntType
+                runSynthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "int"))]) ~?= TableType StringType IntType,
+                runSynthesis store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
+                runSynthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) ~?= TableType StringType IntType,
+                runSynthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) ~?= TableType StringType (UnionType IntType StringType),
+                runSynthesis store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) ~?= TableType (UnionType StringType IntType) IntType, 
+                runSynthesis store (TableConst [FieldKey (Var (Name "int-or-string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) ~?= TableType (UnionType IntType StringType) IntType
             ]
 
 -- Test synthesis function with Call as input
@@ -276,18 +276,18 @@ test_synthesisCall =
     "synthesis Call" ~:
         TestList
             [ 
-                synthesis store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) ~?= UnknownType,
-                synthesis store (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) ~?= UnknownType,
-                synthesis store (Call (Name "function1") [Var (Name "int")]) ~?= StringType,
-                synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType,
-                synthesis store (Call (Name "function4") [Var (Name "string")]) ~?= UnknownType, 
-                synthesis store (Call (Name "function4") [Var (Name "boolean")]) ~?= UnknownType, 
-                synthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType, 
-                synthesis store (Call (Name "function1") []) ~?= UnknownType, 
-                synthesis store (Call (Name "function1") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
-                synthesis store (Call (Name "function0") []) ~?= StringType, 
-                synthesis store (Call (Name "function0") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
-                synthesis store (Call (Name "function0") [Val NilVal]) ~?= UnknownType 
+                runSynthesis store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) ~?= UnknownType,
+                runSynthesis store (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) ~?= UnknownType,
+                runSynthesis store (Call (Name "function1") [Var (Name "int")]) ~?= StringType,
+                runSynthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType,
+                runSynthesis store (Call (Name "function4") [Var (Name "string")]) ~?= UnknownType, 
+                runSynthesis store (Call (Name "function4") [Var (Name "boolean")]) ~?= UnknownType, 
+                runSynthesis store (Call (Name "function4") [Var (Name "int")]) ~?= UnionType IntType StringType, 
+                runSynthesis store (Call (Name "function1") []) ~?= UnknownType, 
+                runSynthesis store (Call (Name "function1") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
+                runSynthesis store (Call (Name "function0") []) ~?= StringType, 
+                runSynthesis store (Call (Name "function0") [Val (IntVal 5), Val (IntVal 4)]) ~?= UnknownType, 
+                runSynthesis store (Call (Name "function0") [Val NilVal]) ~?= UnknownType 
             ]
 
 test_typeCheckStatement :: Test 
@@ -309,11 +309,11 @@ test = runTestTT $ TestList [test_typeCheckStatement, test_isSubtype, test_check
 
 -- Quickcheck property for checker function
 prop_checker :: Expression -> LType -> Bool
-prop_checker e t = checker store e t == (synthesis store e == t)
+prop_checker e t = checker store e t == (runSynthesis store e == t)
 
 -- Quickcheck property for synthesis function
 prop_synthesis :: Expression -> Bool
-prop_synthesis e = checker store e (synthesis store e)
+prop_synthesis e = checker store e (runSynthesis store e)
 
 qc :: IO ()
 qc = do
