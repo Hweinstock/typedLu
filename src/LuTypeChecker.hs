@@ -224,6 +224,10 @@ errorMsg :: String -> LType -> LType -> String
 errorMsg errorType expectedType actualType = 
     errorType ++ ": expected type [" ++ pretty expectedType ++ "] got type [" ++ pretty actualType ++ "]" 
 
+errorMsgExpected :: String -> LType -> String 
+errorMsgExpected errorType expectedType = 
+    errorType ++ ": expected type [" ++ pretty expectedType ++ "]"
+
 -- | typeCheck blocks individually, with some state. 
 typeCheckBlocks :: Environment -> [Block] -> Either String ()
 typeCheckBlocks env = foldr checkBlock (Right ()) where 
@@ -333,45 +337,32 @@ checkSameType e1 e2 = do
         (Right t1, Right t2) -> return $ Right (t1 <: t2 && t2 <: t1)
         (Left error, _) -> return $ Left error
         (_, Left error) -> return $ Left error
+ 
+synthCall :: LType -> [Expression] -> TypecheckerState LType 
+synthCall (FunctionType Never returnType) [] = return $ Right returnType
+synthCall (FunctionType paramType returnType) (p : ps) = do 
+    let nextFunction = if null ps then FunctionType Never returnType else returnType
+    eRes <- checker p paramType 
+    case eRes of 
+        (Left l) -> return $ Left l
+        Right False -> return $ Left (errorMsgExpected "ParameterAssignment" paramType)
+        Right True -> synthCall nextFunction ps
+synthCall t _ = return $ Left (errorMsg "CallNonFunc" t (FunctionType Never AnyType))
 
--- TODO: generalize two cases here. 
-synthParams :: LType -> [Expression] -> TypecheckerState LType 
-synthParams (FunctionType Never returnType) [] = return $ Right returnType
-synthParams (FunctionType paramType returnType) [p] = do 
-    ePType <- synthesis p
-    case ePType of 
-        l@(Left _) -> return l
-        Right pType -> if pType <: paramType
-                            then synthParams (FunctionType Never returnType) []
-                            else return $ Left (errorMsg "ParameterAssignment" paramType pType)
-synthParams (FunctionType paramType returnType) (p : ps) = do 
-    ePType <- synthesis p
-    env <- S.get
-    case ePType of 
-        l@(Left _) -> return l
-        Right pType -> if pType <: paramType
-                            then synthParams returnType ps
-                            else return $ Left (errorMsg "ParameterAssignment" paramType pType ++ show env)
-synthParams t _ = return $ Left (errorMsg "CallNonFunc" t (FunctionType Never AnyType))
-
--- TODO: generalize two cases. 
 synthOp2 :: Bop -> Expression -> Expression -> TypecheckerState LType                            
-synthOp2 op e1 e2 | isPolymorphicBop op = do 
-    curStore <- S.get
+synthOp2 op e1 e2 = do 
+            eOpType <- synth op 
+            case eOpType of 
+                Right opType -> synthCall opType [e1, e2]
+                (Left error) -> return $ Left error
+
+synthOp2Poly :: Bop -> Expression -> Expression -> TypecheckerState LType 
+synthOp2Poly op e1 e2 = do 
     eSameType <- checkSameType e1 e2 
     case eSameType of 
         Right False -> return $ Left "Recieved two different types in Op2 execution."
         (Left error) -> return $ Left error
-        Right True -> do 
-            eOpType <- synth op 
-            case eOpType of 
-                Right opType -> synthParams opType [e1, e2]
-                (Left error) -> return $ Left error
-synthOp2 op e1 e2 = do 
-            eOpType <- synth op 
-            case eOpType of 
-                Right opType -> synthParams opType [e1, e2]
-                (Left error) -> return $ Left error
+        Right True -> synthOp2 op e1 e2
 
 typeCheckFuncBody :: Name -> TypecheckerState () 
 typeCheckFuncBody n = do 
@@ -391,15 +382,16 @@ synthesis (Call (Name n) pms) = do
     eFType <- synthesis (Var (Name n))
     case eFType of 
         Right fType -> do 
-            res <- synthParams fType pms 
+            res <- synthCall fType pms 
             S.modify exitScope  
             return res
         l@(Left _) -> return l
 synthesis (Op1 uop exp) = do 
     eOpType <- synth uop
     case eOpType of 
-        Right opType -> synthParams opType [exp]
+        Right opType -> synthCall opType [exp]
         l@(Left _) -> return l
+synthesis (Op2 exp1 bop exp2) | isPolymorphicBop bop = synthOp2Poly bop exp1 exp2   
 synthesis (Op2 exp1 bop exp2) = synthOp2 bop exp1 exp2
 synthesis (Val v) = synth v
 synthesis (Var v) = synth v
