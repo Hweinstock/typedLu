@@ -64,116 +64,116 @@ test_isSubtype =
 ===================================================================
 -}
 
--- Test checker function with Var as input
+-- Test runChecker function with Var as input
 test_checkerVar :: Test
 test_checkerVar =
-    "checker Var" ~:
+    "runChecker Var" ~:
         TestList
             [ 
-                checker store (Var (Name "int")) IntType ~?= True,
-                checker store (Var (Name "string")) IntType ~?= False,
-                checker store (Var (Name "string")) StringType ~?= True,
-                checker store (Var (Name "int")) StringType ~?= False,
-                checker store (Var (Name "boolean")) BooleanType ~?= True,
-                checker store (Var (Name "int")) BooleanType ~?= False,
-                checker store (Var (Name "table1")) (TableType StringType BooleanType) ~?= True,
-                checker store (Var (Name "table2")) (TableType StringType BooleanType) ~?= False,
-                checker store (Var (Name "table3")) (TableType StringType BooleanType) ~?= False,
-                checker store (Var (Name "function1")) (FunctionType IntType StringType) ~?= True,
-                checker store (Var (Name "function2")) (FunctionType IntType StringType) ~?= False,
-                checker store (Var (Name "function3")) (FunctionType IntType StringType) ~?= False,
-                checker store (Var (Name "function4")) (FunctionType IntType StringType) ~?= False,
-                checker store (Var (Name "function4")) (FunctionType IntType (UnionType IntType StringType)) ~?= True,
-                checker store (Var (Name "function1")) (FunctionType IntType (UnionType IntType StringType)) ~?= True
+                runChecker store (Var (Name "int")) IntType ~?= True,
+                runChecker store (Var (Name "string")) IntType ~?= False,
+                runChecker store (Var (Name "string")) StringType ~?= True,
+                runChecker store (Var (Name "int")) StringType ~?= False,
+                runChecker store (Var (Name "boolean")) BooleanType ~?= True,
+                runChecker store (Var (Name "int")) BooleanType ~?= False,
+                runChecker store (Var (Name "table1")) (TableType StringType BooleanType) ~?= True,
+                runChecker store (Var (Name "table2")) (TableType StringType BooleanType) ~?= False,
+                runChecker store (Var (Name "table3")) (TableType StringType BooleanType) ~?= False,
+                runChecker store (Var (Name "function1")) (FunctionType IntType StringType) ~?= True,
+                runChecker store (Var (Name "function2")) (FunctionType IntType StringType) ~?= False,
+                runChecker store (Var (Name "function3")) (FunctionType IntType StringType) ~?= False,
+                runChecker store (Var (Name "function4")) (FunctionType IntType StringType) ~?= False,
+                runChecker store (Var (Name "function4")) (FunctionType IntType (UnionType IntType StringType)) ~?= True,
+                runChecker store (Var (Name "function1")) (FunctionType IntType (UnionType IntType StringType)) ~?= True
             ]
 
--- Test checker function with Val as input
+-- Test runChecker function with Val as input
 test_checkerVal :: Test
 test_checkerVal =
-    "checker Val" ~:
+    "runChecker Val" ~:
         TestList
             [ 
-                checker store (Val (IntVal 0)) IntType ~?= True,
-                checker store (Val (StringVal "")) IntType ~?= False,
-                checker store (Val (StringVal "")) StringType ~?= True,
-                checker store (Val (IntVal 0)) StringType ~?= False,
-                checker store (Val (BoolVal True)) BooleanType ~?= True,
-                checker store (Val (IntVal 0)) BooleanType ~?= False,
-                checker store (Val (FunctionVal [("x", IntType)] StringType (Block []))) (FunctionType IntType StringType) ~?= True,
-                checker store (Val (FunctionVal [("x", StringType)] StringType (Block []))) (FunctionType IntType StringType) ~?= False,
-                checker store (Val (FunctionVal [("x", IntType)] IntType (Block []))) (FunctionType IntType StringType) ~?= False
+                runChecker store (Val (IntVal 0)) IntType ~?= True,
+                runChecker store (Val (StringVal "")) IntType ~?= False,
+                runChecker store (Val (StringVal "")) StringType ~?= True,
+                runChecker store (Val (IntVal 0)) StringType ~?= False,
+                runChecker store (Val (BoolVal True)) BooleanType ~?= True,
+                runChecker store (Val (IntVal 0)) BooleanType ~?= False,
+                runChecker store (Val (FunctionVal [("x", IntType)] StringType (Block []))) (FunctionType IntType StringType) ~?= True,
+                runChecker store (Val (FunctionVal [("x", StringType)] StringType (Block []))) (FunctionType IntType StringType) ~?= False,
+                runChecker store (Val (FunctionVal [("x", IntType)] IntType (Block []))) (FunctionType IntType StringType) ~?= False
             ]
 
--- Test checker function with Op1 as input
+-- Test runChecker function with Op1 as input
 test_checkerOp1 :: Test
 test_checkerOp1 =
-    "checker Op1" ~:
+    "runChecker Op1" ~:
         TestList
             [ 
-                checker store (Op1 Neg (Var (Name "int"))) IntType ~?= True,
-                checker store (Op1 Neg (Var (Name "string"))) IntType ~?= False,
-                checker store (Op1 Not (Var (Name "boolean"))) BooleanType ~?= True,
-                checker store (Op1 Not (Var (Name "int"))) BooleanType ~?= True,
-                checker store (Op1 Len (Var (Name "string"))) IntType ~?= True,
-                checker store (Op1 Len (Var (Name "int"))) IntType ~?= True
+                runChecker store (Op1 Neg (Var (Name "int"))) IntType ~?= True,
+                runChecker store (Op1 Neg (Var (Name "string"))) IntType ~?= False,
+                runChecker store (Op1 Not (Var (Name "boolean"))) BooleanType ~?= True,
+                runChecker store (Op1 Not (Var (Name "int"))) BooleanType ~?= True,
+                runChecker store (Op1 Len (Var (Name "string"))) IntType ~?= True,
+                runChecker store (Op1 Len (Var (Name "int"))) IntType ~?= True
             ]
 
--- Test checker function with Op2 as input
+-- Test runChecker function with Op2 as input
 test_checkerOp2 :: Test
 test_checkerOp2 =
-    "checker Op2" ~:
+    "runChecker Op2" ~:
         TestList
             [ 
-                checker store (Op2 (Var (Name "int")) Plus (Var (Name "int"))) IntType ~?= True,
-                checker store (Op2 (Var (Name "string")) Plus (Var (Name "int"))) IntType ~?= False,
-                checker store (Op2 (Var (Name "int")) Minus (Var (Name "int"))) IntType ~?= True,
-                checker store (Op2 (Var (Name "boolean")) Minus (Var (Name "int"))) IntType ~?= False,
-                checker store (Op2 (Var (Name "int")) Times (Var (Name "int"))) IntType ~?= True,
-                checker store (Op2 (Var (Name "string")) Times (Var (Name "int"))) IntType ~?= False,
-                checker store (Op2 (Var (Name "int")) Divide (Var (Name "int"))) IntType ~?= True,
-                checker store (Op2 (Var (Name "boolean")) Divide (Var (Name "int"))) IntType ~?= False,
-                checker store (Op2 (Var (Name "int")) Modulo (Var (Name "int"))) IntType ~?= True,
-                checker store (Op2 (Var (Name "string")) Modulo (Var (Name "int"))) IntType ~?= False,
-                checker store (Op2 (Var (Name "int")) Eq (Var (Name "int"))) BooleanType ~?= True,
-                checker store (Op2 (Var (Name "int")) Eq (Var (Name "string"))) BooleanType ~?= False,
-                checker store (Op2 (Var (Name "string")) Gt (Var (Name "string"))) BooleanType ~?= True,
-                checker store (Op2 (Var (Name "string")) Gt (Var (Name "boolean"))) BooleanType ~?= False,
-                checker store (Op2 (Var (Name "boolean")) Ge (Var (Name "boolean"))) BooleanType ~?= True,
-                checker store (Op2 (Var (Name "boolean")) Ge (Var (Name "int"))) BooleanType ~?= False,
-                checker store (Op2 (Var (Name "string")) Lt (Var (Name "string"))) BooleanType ~?= True,
-                checker store (Op2 (Var (Name "string")) Lt (Var (Name "int"))) BooleanType ~?= False,
-                checker store (Op2 (Var (Name "boolean")) Le (Var (Name "boolean"))) BooleanType ~?= True,
-                checker store (Op2 (Var (Name "boolean")) Le (Var (Name "string"))) BooleanType ~?= False,
-                checker store (Op2 (Var (Name "string")) Concat (Var (Name "string"))) StringType ~?= True,
-                checker store (Op2 (Var (Name "string")) Concat (Var (Name "int"))) StringType ~?= False
+                runChecker store (Op2 (Var (Name "int")) Plus (Var (Name "int"))) IntType ~?= True,
+                runChecker store (Op2 (Var (Name "string")) Plus (Var (Name "int"))) IntType ~?= False,
+                runChecker store (Op2 (Var (Name "int")) Minus (Var (Name "int"))) IntType ~?= True,
+                runChecker store (Op2 (Var (Name "boolean")) Minus (Var (Name "int"))) IntType ~?= False,
+                runChecker store (Op2 (Var (Name "int")) Times (Var (Name "int"))) IntType ~?= True,
+                runChecker store (Op2 (Var (Name "string")) Times (Var (Name "int"))) IntType ~?= False,
+                runChecker store (Op2 (Var (Name "int")) Divide (Var (Name "int"))) IntType ~?= True,
+                runChecker store (Op2 (Var (Name "boolean")) Divide (Var (Name "int"))) IntType ~?= False,
+                runChecker store (Op2 (Var (Name "int")) Modulo (Var (Name "int"))) IntType ~?= True,
+                runChecker store (Op2 (Var (Name "string")) Modulo (Var (Name "int"))) IntType ~?= False,
+                runChecker store (Op2 (Var (Name "int")) Eq (Var (Name "int"))) BooleanType ~?= True,
+                runChecker store (Op2 (Var (Name "int")) Eq (Var (Name "string"))) BooleanType ~?= False,
+                runChecker store (Op2 (Var (Name "string")) Gt (Var (Name "string"))) BooleanType ~?= True,
+                runChecker store (Op2 (Var (Name "string")) Gt (Var (Name "boolean"))) BooleanType ~?= False,
+                runChecker store (Op2 (Var (Name "boolean")) Ge (Var (Name "boolean"))) BooleanType ~?= True,
+                runChecker store (Op2 (Var (Name "boolean")) Ge (Var (Name "int"))) BooleanType ~?= False,
+                runChecker store (Op2 (Var (Name "string")) Lt (Var (Name "string"))) BooleanType ~?= True,
+                runChecker store (Op2 (Var (Name "string")) Lt (Var (Name "int"))) BooleanType ~?= False,
+                runChecker store (Op2 (Var (Name "boolean")) Le (Var (Name "boolean"))) BooleanType ~?= True,
+                runChecker store (Op2 (Var (Name "boolean")) Le (Var (Name "string"))) BooleanType ~?= False,
+                runChecker store (Op2 (Var (Name "string")) Concat (Var (Name "string"))) StringType ~?= True,
+                runChecker store (Op2 (Var (Name "string")) Concat (Var (Name "int"))) StringType ~?= False
             ]
 
--- Test checker function with TableConst as input
+-- Test runChecker function with TableConst as input
 test_checkerTableConst :: Test
 test_checkerTableConst =
-    "checker TableConst" ~:
+    "runChecker TableConst" ~:
         TestList
             [ 
-                checker store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "int"))]) (TableType StringType IntType) ~?= True,
-                checker store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) (TableType StringType IntType) ~?= False,
-                checker store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) (TableType StringType IntType) ~?= True,
-                checker store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) (TableType StringType IntType) ~?= False,
-                checker store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) (TableType StringType IntType) ~?= False
+                runChecker store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "int"))]) (TableType StringType IntType) ~?= True,
+                runChecker store (TableConst [FieldName "x" (Var (Name "int")), FieldName "y" (Var (Name "string"))]) (TableType StringType IntType) ~?= False,
+                runChecker store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "int"))]) (TableType StringType IntType) ~?= True,
+                runChecker store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "string")) (Var (Name "string"))]) (TableType StringType IntType) ~?= False,
+                runChecker store (TableConst [FieldKey (Var (Name "string")) (Var (Name "int")), FieldKey (Var (Name "int")) (Var (Name "int"))]) (TableType StringType IntType) ~?= False
             ]
 
--- Test checker function with Call as input
+-- Test runChecker function with Call as input
 test_checkerCall :: Test
 test_checkerCall =
-    "checker Call" ~:
+    "runChecker Call" ~:
         TestList
             [ 
-                checker store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
-                checker store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
-                checker store (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
-                checker store (Call (Name "function1") [Var (Name "int")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
-                checker store (Call (Name "function4") [Var (Name "int")]) (UnionType IntType StringType) ~?= True,
-                checker store (Call (Name "function4") [Var (Name "string")]) (UnionType IntType StringType) ~?= False,
-                checker store (Call (Name "function4") [Var (Name "boolean")]) (FunctionType IntType (UnionType IntType StringType)) ~?= False
+                runChecker store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
+                runChecker store (Call (Name "function1") [Var (Name "int"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
+                runChecker store (Call (Name "function1") [Var (Name "String"), Var (Name "string")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
+                runChecker store (Call (Name "function1") [Var (Name "int")]) (FunctionType IntType (FunctionType IntType StringType)) ~?= False,
+                runChecker store (Call (Name "function4") [Var (Name "int")]) (UnionType IntType StringType) ~?= True,
+                runChecker store (Call (Name "function4") [Var (Name "string")]) (UnionType IntType StringType) ~?= False,
+                runChecker store (Call (Name "function4") [Var (Name "boolean")]) (FunctionType IntType (UnionType IntType StringType)) ~?= False
             ]
 
 {-
@@ -307,13 +307,13 @@ test = runTestTT $ TestList [test_typeCheckStatement, test_isSubtype, test_check
 ===================================================================
 -}
 
--- Quickcheck property for checker function
+-- Quickcheck property for runChecker function
 prop_checker :: Expression -> LType -> Bool
-prop_checker e t = checker store e t == (runSynthesis store e == t)
+prop_checker e t = runChecker store e t == (runSynthesis store e == t)
 
 -- Quickcheck property for synthesis function
 prop_synthesis :: Expression -> Bool
-prop_synthesis e = checker store e (runSynthesis store e)
+prop_synthesis e = runChecker store e (runSynthesis store e)
 
 qc :: IO ()
 qc = do

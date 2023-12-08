@@ -31,6 +31,14 @@ data LType =
 (<:) (FunctionType t1 t2) (FunctionType t3 t4) = t3 <: t1 && t2 <: t4
 (<:) _ _ = False
 
+constructUnionType :: [LType] -> LType 
+constructUnionType = foldr constructTypeHelper UnknownType where 
+    constructTypeHelper :: LType -> LType -> LType 
+    constructTypeHelper t1 UnknownType = t1
+    constructTypeHelper t1 accT | t1 <: accT = accT 
+    constructTypeHelper t1 accT | accT <: t1 = t1 
+    constructTypeHelper t1 accT = UnionType t1 accT
+
 instance Arbitrary LType where
     arbitrary :: Gen LType
     arbitrary = undefined

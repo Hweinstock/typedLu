@@ -83,6 +83,9 @@ getTypeFromEnv env n = case (getGTypeFromEnv env n, getLTypeFromEnv env n) of
     (Just t, _) -> Just t 
     _ -> Nothing
 
+lookupType :: Name -> State Environment (Maybe LType) 
+lookupType n = S.get >>= \env -> return $ getTypeFromEnv env n
+
 getFuncFromEnv :: Environment -> Name -> Maybe Value 
 getFuncFromEnv env n = Map.lookup n (functionMap env)
 
@@ -138,26 +141,26 @@ instance Synthable Value where
                 S.modify exitScope
                 return $ Right $ synthFunc pms rt
             Left l -> return $ Left l
-            where 
-                synthFunc :: [Parameter] -> LType -> LType 
-                synthFunc [] rt = FunctionType Never rt 
-                synthFunc [(_, t)] rt = FunctionType t rt
-                synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
+
+synthFunc :: [Parameter] -> LType -> LType 
+synthFunc [] rt = FunctionType Never rt 
+synthFunc [(_, t)] rt = FunctionType t rt
+synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
 
 instance Synthable Var where 
     synth (Name n) = do 
-        s <- S.get 
-        case getTypeFromEnv s n of 
-            Just t -> return $ Right t 
+        mT <- lookupType n 
+        case mT of 
+            Just t -> return $ Right t
             _ -> return $ Right NilType
     synth (Dot exp n) = do 
-        eTExp <- synthesis exp 
-        return $ case eTExp of 
+        eExpType <- synthesis exp 
+        return $ case eExpType of 
             Left l -> Left l 
             Right tExp@(TableType t1 t2) -> case typecheckTableAccess tExp StringType Never of 
                 Right () -> Right t2 
                 Left l -> Left l
-            Right _ -> Left "Cannot access not table type via dot method."
+            Right _ -> Left "Cannot access non table type via dot method."
 
     synth (Proj tExp kExp) = do 
         eTableType <- synthesis tExp 
@@ -178,7 +181,7 @@ instance Synthable [TableField] where
             Left l -> Left l
             Right typePairs -> do 
                 let (keyTypes, valTypes) = unzip typePairs 
-                Right $ TableType (constructType keyTypes) (constructType valTypes)
+                Right $ TableType (constructUnionType keyTypes) (constructUnionType valTypes)
         
         where 
 
@@ -193,14 +196,6 @@ instance Synthable [TableField] where
                 (Left l, _, _) -> return $ Left l 
                 (_, Left l, _) -> return $ Left l
                 (_, _, Left l) -> return $ Left l
-
-        constructType :: [LType] -> LType 
-        constructType = foldr constructTypeHelper UnknownType where 
-            constructTypeHelper :: LType -> LType -> LType 
-            constructTypeHelper t1 UnknownType = t1
-            constructTypeHelper t1 accT | t1 <: accT = accT 
-            constructTypeHelper t1 accT | accT <: t1 = t1 
-            constructTypeHelper t1 accT = UnionType t1 accT
 
 prepareFunctionEnv :: [Parameter] -> LType -> State Environment ()
 prepareFunctionEnv pms rt = do 
@@ -238,11 +233,12 @@ typeCheckBlocks env = foldr checkBlock (Right ()) where
     
 -- | Check that given expression is boolean, then check underlying blocks.
 typeCheckCondtionalBlocks :: Expression -> [Block] -> String -> TypecheckerState ()
-typeCheckCondtionalBlocks exp bs errorMsg = do 
-    curStore <- S.get 
-    if not (checker curStore exp BooleanType) 
-        then return $ Left errorMsg
-        else return $ typeCheckBlocks curStore bs
+typeCheckCondtionalBlocks exp bs errorStr = do 
+    eRes <- checker exp BooleanType
+    curStore <- S.get
+    case eRes of 
+        Right True -> return $ typeCheckBlocks curStore bs
+        _ -> return $ Left errorStr
 
 -- | Given a block and an environment, check if the types are consistent in the block. 
 typeCheckBlock :: Block -> TypecheckerState ()
@@ -409,12 +405,19 @@ synthesis (Val v) = synth v
 synthesis (Var v) = synth v
 synthesis (TableConst tfs) = synth tfs  
 
+checker :: Expression -> LType -> TypecheckerState Bool 
+checker exp expectedType = do 
+    eType <- synthesis exp 
+    return $ case eType of 
+        Left l -> Left l
+        Right actualType -> Right $ actualType <: expectedType
+
 runSynthesis :: Environment -> Expression -> LType 
 runSynthesis env exp = case S.evalState (synthesis exp) env of 
     Right t -> t 
     Left _ -> UnknownType
 
 -- | Check that type of given expression is an instance of given type. 
-checker :: Environment -> Expression -> LType -> Bool
-checker env e = (<:) (runSynthesis env e)
+runChecker :: Environment -> Expression -> LType -> Bool
+runChecker env e = (<:) (runSynthesis env e)
 
