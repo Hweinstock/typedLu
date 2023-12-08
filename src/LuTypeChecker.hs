@@ -29,25 +29,74 @@ instance Monad m => Applicative (EitherT m) where
 instance Monad m => Functor (EitherT m) where
     fmap = liftM
 
-data Environment = Environment {
-    typeMap :: Map Name LType,
-    functionMap :: Map Name Value
+returnTypeName :: Name 
+returnTypeName = "@R"
+
+getReturnTypeName :: State Environment Name 
+getReturnTypeName = do 
+    env <- S.get 
+    return (returnTypeName ++ show (curDepth env))
+
+data LocalVar = LocalVar {
+    lType :: LType,
+    depth :: Int
 }
 
-addTypeToEnv :: (Name, LType) -> Environment -> Environment
-addTypeToEnv (k, v) env = env {typeMap = Map.insert k v (typeMap env)}
+instance Show LocalVar where 
+    show :: LocalVar -> String 
+    show lv = show (lType lv) ++ ":" ++ show (depth lv)
+
+data Environment = Environment {
+    gTypeMap :: Map Name LType,
+    lTypeMap :: Map Name LocalVar,
+    functionMap :: Map Name Value, 
+    curDepth :: Int
+}
+
+instance Show Environment where 
+    show :: Environment -> String 
+    show env = show (gTypeMap env) ++ "\n" ++ show (lTypeMap env) ++ "\n" ++ show (functionMap env) 
+
+emptyStore :: Environment 
+emptyStore = Environment {gTypeMap = Map.empty, functionMap = Map.empty, lTypeMap = Map.empty, curDepth = 0}
+
+addGTypeToEnv :: (Name, LType) -> Environment -> Environment
+addGTypeToEnv (k, v) env = env {gTypeMap = Map.insert k v (gTypeMap env)}
+
+addLTypeToEnv :: (Name, LType) -> Environment -> Environment
+addLTypeToEnv (k, v) env = env {lTypeMap = Map.insert k lv (lTypeMap env)} where 
+    lv = LocalVar {lType = v, depth = curDepth env}
 
 addFuncToEnv :: (Name, Value) -> Environment -> Environment
 addFuncToEnv (k, v) env = env {functionMap = Map.insert k v (functionMap env)}
 
+getGTypeFromEnv :: Environment -> Name -> Maybe LType 
+getGTypeFromEnv env n = Map.lookup n (gTypeMap env)
+
+getLTypeFromEnv :: Environment -> Name -> Maybe LType 
+getLTypeFromEnv env n = Map.lookup n (lTypeMap env) >>= \m -> return (lType m)
+
 getTypeFromEnv :: Environment -> Name -> Maybe LType 
-getTypeFromEnv env n = Map.lookup n (typeMap env)
+getTypeFromEnv env n = case (getGTypeFromEnv env n, getLTypeFromEnv env n) of 
+    (_, Just t) -> Just t
+    (Just t, _) -> Just t 
+    _ -> Nothing
 
 getFuncFromEnv :: Environment -> Name -> Maybe Value 
 getFuncFromEnv env n = Map.lookup n (functionMap env)
 
 removeFuncFromEnv :: Environment -> Name -> Environment 
 removeFuncFromEnv env n = env {functionMap = Map.delete n (functionMap env)}
+
+-- | Decrease depth of scope and remove variables at this level. 
+exitScope :: Environment -> Environment 
+exitScope env = env {lTypeMap = newLocalMap, curDepth = curDepth env - 1} where 
+    newLocalMap :: Map Name LocalVar 
+    newLocalMap = Map.filter (\v -> depth v /= curDepth env) (lTypeMap env)
+
+-- | Increase depth of scope. 
+enterScope :: Environment -> Environment 
+enterScope env = env {curDepth = curDepth env + 1}
 
 -- type TypecheckerState = EitherT (State EnvironmentTypes) ()  -- transformer version
 
@@ -82,10 +131,12 @@ instance Synthable2 Value where
     synth2 (TableVal n) = undefined --what is this case? 
     synth2 (FunctionVal pms rt b) = do 
         prepareFunctionEnv2 pms rt 
-        env <- S.get
-        return $ case S.evalState (typeCheckBlock b) env of 
-            Right () -> Right $ synthFunc pms rt
-            Left l -> Left l
+        s <- S.get
+        case S.evalState (typeCheckBlock b) s of 
+            Right () -> do 
+                S.modify exitScope
+                return $ Right $ synthFunc pms rt
+            Left l -> return $ Left l
             where 
                 synthFunc :: [Parameter] -> LType -> LType 
                 synthFunc [] rt = FunctionType Never rt 
@@ -189,10 +240,14 @@ instance Synthable Value where
 
 -- | Return new environment with initialized parameters and return flag in given environment. 
 prepareFunctionEnv :: Environment -> [Parameter] -> LType -> Environment 
-prepareFunctionEnv env pms rt = foldr addTypeToEnv env (("@R", rt) : pms) 
+prepareFunctionEnv env pms rt = foldr addGTypeToEnv env ((returnTypeName, rt) : pms) 
 
 prepareFunctionEnv2 :: [Parameter] -> LType -> State Environment ()
-prepareFunctionEnv2 pms rt = S.modify (\e -> foldr addTypeToEnv e (("@R", rt) : pms))
+prepareFunctionEnv2 pms rt = do 
+    S.modify enterScope
+    curRtName <- getReturnTypeName
+    S.modify (\e -> foldr addLTypeToEnv e ((curRtName, rt) : pms))
+
 
 instance Synthable [TableField] where 
     synth env tfs = let (keyTypes, valTypes) = unzip (map (synthTableField env) tfs) in 
@@ -213,7 +268,7 @@ instance Synthable [TableField] where
 -- | Lookup type in store, if not found, return NilType.
 --   For dot/proj, if table doesn't exist -> Unknown, or if key type doesn't match expected key type.
 instance Synthable Var where 
-    synth env (Name n) = case Map.lookup n (typeMap env) of 
+    synth env (Name n) = case Map.lookup n (gTypeMap env) of 
         Just t -> t 
         _ -> NilType
     synth env (Dot exp n) = let tExp = synthesis env exp in 
@@ -234,12 +289,6 @@ isPolymorphicBop Ge = True
 isPolymorphicBop Lt = True 
 isPolymorphicBop Le = True 
 isPolymorphicBop _ = False 
-
-returnTypeName :: Name 
-returnTypeName = "@R"
-
-emptyStore :: Environment 
-emptyStore = Environment {typeMap = Map.empty, functionMap = Map.empty}
 
 typeCheckAST :: Block -> Either String () 
 typeCheckAST b = S.evalState (typeCheckBlock b) emptyStore
@@ -291,14 +340,16 @@ typeCheckStatement (While exp b) = typeCheckCondtionalBlocks exp [b] "Non-boolea
 typeCheckStatement Empty = return $ Right ()  
 typeCheckStatement (Repeat b exp) = typeCheckCondtionalBlocks exp [b] "Non-boolean in repeat condition"
 typeCheckStatement (Return exp) = do 
-    eExpectedType <- synth2 (Name "@R")
+    curRtName <- getReturnTypeName
+    eExpectedType <- synth2 (Name curRtName)
     eActualType <- synthesisWithState exp 
+    env <- S.get
     return $ case (eExpectedType, eActualType) of 
         (Left l, _) -> Left l 
         (_, Left l) -> Left l
         (Right expectedType, Right actualType) -> if actualType <: expectedType 
             then Right () 
-            else Left (errorMsg "Return" expectedType actualType)
+            else Left (errorMsg "Return" expectedType actualType ++ show env)
 
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState ()
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
@@ -309,16 +360,16 @@ typeCheckAssign v t exp = do
         Left l -> return $ Left l
         Right tExpType -> if not (tExpType <: t) 
             then return $ Left (errorMsg "AssignmentError" t tExpType)
-            else doTypeAssignment v t exp
+            else return $ Right () 
     
 doTypeAssignment ::  Var -> LType -> Expression -> TypecheckerState ()
 doTypeAssignment (Name n) tExpType exp = do 
-    etv <- synth2 (Name n)
-    case etv of 
+    eCurrentType <- synth2 (Name n)
+    case eCurrentType of 
         Left l -> return $ Left l
         Right NilType -> updateEnv n tExpType exp
         Right UnknownType -> return $ Left "Unable to determine type of expression in assignment"
-        Right realT -> if realT /= tExpType then 
+        Right curType -> if curType /= tExpType then 
             return $ Left "Cannot redefine variable to new type"
             else updateEnv n tExpType exp
 doTypeAssignment (Dot tExp n) vExpType _ = do 
@@ -345,7 +396,7 @@ typecheckTableAccess _ _ _= Left "Unable to access value from non-table"
 updateEnv :: Name -> LType -> Expression -> TypecheckerState ()
 updateEnv n t exp = do 
     env <- S.get 
-    S.modify (addTypeToEnv (n, t))
+    S.modify (addGTypeToEnv (n, t))
     case (t, exp) of 
         (FunctionType _ _, Val f) -> do 
             S.modify (addFuncToEnv (n, f))
@@ -401,11 +452,12 @@ synthParamsWithState (FunctionType paramType returnType) [p] = do
                             else return $ Left (errorMsg "ParameterAssignment" paramType pType)
 synthParamsWithState (FunctionType paramType returnType) (p : ps) = do 
     ePType <- synthesisWithState p
+    env <- S.get
     case ePType of 
         l@(Left _) -> return l
         Right pType -> if pType <: paramType
                             then synthParamsWithState returnType ps
-                            else return $ Left (errorMsg "ParameterAssignment" paramType pType)
+                            else return $ Left (errorMsg "ParameterAssignment" paramType pType ++ show env)
 synthParamsWithState t _ = return $ Left (errorMsg "CallNonFunc" t (FunctionType Never AnyType))
 
 synthOp2 :: Environment -> Bop -> Expression -> Expression -> LType                            
@@ -449,8 +501,9 @@ typeCheckFuncBody n = do
     case funcValue of 
         Just (FunctionVal pms rt b) -> do 
             prepareFunctionEnv2 pms rt
-            S.modify (\e -> removeFuncFromEnv e n)
-            typeCheckBlock b
+            S.modify (`removeFuncFromEnv` n)
+            res <- typeCheckBlock b
+            return $ Right ()
         _ -> return $ Left ("Failed to find function [" ++ n ++ "] in store") -- This should never happen. TODO: force it to be impossible.
 
 synthesisWithState :: Expression -> TypecheckerState LType  
@@ -458,7 +511,10 @@ synthesisWithState (Call (Name n) pms) = do
     typeCheckFuncBody n 
     eFType <- synthesisWithState (Var (Name n))
     case eFType of 
-        Right fType -> synthParamsWithState fType pms 
+        Right fType -> do 
+            res <- synthParamsWithState fType pms 
+            S.modify exitScope  
+            return res
         l@(Left _) -> return l
 synthesisWithState (Op1 uop exp) = do 
     eOpType <- synth2 uop

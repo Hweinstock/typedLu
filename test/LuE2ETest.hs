@@ -3,7 +3,7 @@ module LuE2ETest where
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
 import LuEvaluator (Store, eval, initialStore, resolveVar, index, globalTableName)
-import LuTypeChecker (typeCheckAST, getTypeEnv, Environment, emptyStore, functionMap, typeMap)
+import LuTypeChecker (typeCheckAST, getTypeEnv, Environment, emptyStore, functionMap, getTypeFromEnv)
 import LuSyntax
 import State qualified as S
 import Data.Map qualified as Map
@@ -98,8 +98,7 @@ seeTypeStore fp = do
     r <- getTypeEnvFile fp 
     case r of 
         Left l -> putStrLn (show l )
-        Right r -> putStrLn (show (typeMap r) )
-
+        Right r -> putStrLn (show  r)
 
 
 testEvalFile :: String -> (Store -> Either String Bool) -> IO () 
@@ -185,7 +184,11 @@ test_typeCheck =
                 "unionTypeFunc" ~: testTypeCheckFile "test/lu/unionTypeFunc.lu" False, 
                 "weirdScopesFunc" ~: testTypeCheckFile "test/lu/weirdScopesFunc.lu" True, 
                 "nestedGlobal" ~: testTypeCheckFile "test/lu/nestedGlobal.lu" False, 
-                "nestedGlobal2" ~: testTypeCheckFile "test/lu/nestedGlobal2.lu" True
+                "nestedGlobal2" ~: testTypeCheckFile "test/lu/nestedGlobal2.lu" True, 
+                "nestedFuncReturnTypeGood" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeGood.lu" True, 
+                "nestedFuncReturnTypeBad" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad.lu" False,
+                "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False
+
             ]
 
 test_typeCheckStore :: Test 
@@ -204,7 +207,7 @@ test_typeCheckStore =
                     _ -> Left "Failed to find"
 
                 inTypeMap :: Name -> Bool -> Environment -> Either String Bool 
-                inTypeMap n expected env = case Map.lookup n (typeMap env) of 
+                inTypeMap n expected env = case getTypeFromEnv env n of 
                     Just _ -> return expected 
                     _ -> return (not expected)
 

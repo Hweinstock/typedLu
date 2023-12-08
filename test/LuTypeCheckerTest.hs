@@ -10,7 +10,7 @@ import Test.QuickCheck qualified as QC
 import LuEvaluator (Store)
 
 store :: Environment
-store  = Environment {typeMap = typeMap, functionMap = Map.empty} where 
+store  = emptyStore {gTypeMap = typeMap} where 
   typeMap = Map.fromList
     [ ("int", IntType),
       ("string", StringType),
