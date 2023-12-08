@@ -50,6 +50,7 @@ library
       LuTypes
       State
       Parser
+      Stack
   hs-source-dirs:
       src
 

@@ -7,6 +7,8 @@ import qualified State as S
 import Data.Map (Map)
 import Data.List (nub)
 import qualified Data.Map as Map
+import Stack (Stack)
+import qualified Stack
 import LuTypes 
 
 -- newtype EitherT m a = EitherT { runEitherT :: m (Either String a) }
@@ -32,41 +34,45 @@ import LuTypes
 returnTypeName :: Name 
 returnTypeName = "@R"
 
-getReturnTypeName :: State Environment Name 
-getReturnTypeName = do 
-    env <- S.get 
-    return (returnTypeName ++ show (curDepth env))
+{- 
+When we see a local variable, add it to the stack. 
+When we want to access a local varaible, we sift through the stack until we find matching name, 
+then we use that name
+
+-}
+
 
 data Environment = Environment {
     gTypeMap :: Map Name LType,
-    lTypeMap :: Map Name LocalVar,
+    localStack :: Stack LocalVar,
     functionMap :: Map Name Value, 
     curDepth :: Int
 }
 
 data LocalVar = LocalVar {
     lType :: LType,
+    name :: Name,
     depth :: Int
 }
 
 instance Show LocalVar where 
     show :: LocalVar -> String 
-    show lv = show (lType lv) ++ ":" ++ show (depth lv)
+    show lv = show (name lv) ++ "=" ++ show (lType lv) ++ ":" ++ show (depth lv)
 
 
 instance Show Environment where 
     show :: Environment -> String 
-    show env = show (gTypeMap env) ++ "\n" ++ show (lTypeMap env) ++ "\n" ++ show (functionMap env) 
+    show env = show (gTypeMap env) ++ "\n" ++ show (localStack env) ++ "\n" ++ show (functionMap env) ++ "[depth=" ++ show (curDepth env) ++ "]"
 
 emptyStore :: Environment 
-emptyStore = Environment {gTypeMap = Map.empty, functionMap = Map.empty, lTypeMap = Map.empty, curDepth = 0}
+emptyStore = Environment {gTypeMap = Map.empty, functionMap = Map.empty, localStack = Stack.empty, curDepth = 0}
 
 addGTypeToEnv :: (Name, LType) -> Environment -> Environment
 addGTypeToEnv (k, v) env = env {gTypeMap = Map.insert k v (gTypeMap env)}
 
 addLTypeToEnv :: (Name, LType) -> Environment -> Environment
-addLTypeToEnv (k, v) env = env {lTypeMap = Map.insert k lv (lTypeMap env)} where 
-    lv = LocalVar {lType = v, depth = curDepth env}
+addLTypeToEnv (n, t) env = env {localStack = Stack.push (localStack env) lv} where 
+    lv = LocalVar {lType = t, name = n, depth = curDepth env}
 
 addFuncToEnv :: (Name, Value) -> Environment -> Environment
 addFuncToEnv (k, v) env = env {functionMap = Map.insert k v (functionMap env)}
@@ -75,7 +81,9 @@ getGTypeFromEnv :: Environment -> Name -> Maybe LType
 getGTypeFromEnv env n = Map.lookup n (gTypeMap env)
 
 getLTypeFromEnv :: Environment -> Name -> Maybe LType 
-getLTypeFromEnv env n = Map.lookup n (lTypeMap env) >>= \m -> return (lType m)
+getLTypeFromEnv env n = case Stack.peekUntil (localStack env) (\lv -> name lv == n) of 
+    Just lv -> Just $ lType lv 
+    _ -> Nothing
 
 getTypeFromEnv :: Environment -> Name -> Maybe LType 
 getTypeFromEnv env n = case (getGTypeFromEnv env n, getLTypeFromEnv env n) of 
@@ -94,9 +102,9 @@ removeFuncFromEnv env n = env {functionMap = Map.delete n (functionMap env)}
 
 -- | Decrease depth of scope and remove variables at this level. 
 exitScope :: Environment -> Environment 
-exitScope env = env {lTypeMap = newLocalMap, curDepth = curDepth env - 1} where 
-    newLocalMap :: Map Name LocalVar 
-    newLocalMap = Map.filter (\v -> depth v /= curDepth env) (lTypeMap env)
+exitScope env = env {localStack = Stack.popUntil (localStack env) (aboveDepth (curDepth env)), curDepth = curDepth env - 1} where 
+    aboveDepth :: Int -> LocalVar -> Bool 
+    aboveDepth n lv = depth lv < curDepth env
 
 -- | Increase depth of scope. 
 enterScope :: Environment -> Environment 
@@ -136,9 +144,9 @@ instance Synthable Value where
     synth (FunctionVal pms rt b) = do 
         prepareFunctionEnv pms rt 
         s <- S.get
+        S.modify exitScope
         case S.evalState (typeCheckBlock b) s of 
             Right () -> do 
-                S.modify exitScope
                 return $ Right $ synthFunc pms rt
             Left l -> return $ Left l
 
@@ -197,10 +205,7 @@ instance Synthable [TableField] where
                 (_, _, Left l) -> return $ Left l
 
 prepareFunctionEnv :: [Parameter] -> LType -> State Environment ()
-prepareFunctionEnv pms rt = do 
-    S.modify enterScope
-    curRtName <- getReturnTypeName
-    S.modify (\e -> foldr addLTypeToEnv e ((curRtName, rt) : pms))
+prepareFunctionEnv pms rt = S.modify enterScope >> S.modify (\e -> foldr addLTypeToEnv e ((returnTypeName, rt) : pms))
 
 isPolymorphicBop :: Bop -> Bool
 isPolymorphicBop Eq = True 
@@ -269,8 +274,7 @@ typeCheckStatement (While exp b) = typeCheckCondtionalBlocks exp [b] "Non-boolea
 typeCheckStatement Empty = return $ Right ()  
 typeCheckStatement (Repeat b exp) = typeCheckCondtionalBlocks exp [b] "Non-boolean in repeat condition"
 typeCheckStatement (Return exp) = do 
-    curRtName <- getReturnTypeName
-    eExpectedType <- synth (Name curRtName)
+    eExpectedType <- synth (Name returnTypeName)
     case eExpectedType of 
         Left error -> return $ Left error
         Right expectedType -> do 
@@ -379,28 +383,28 @@ typeCheckFuncBody n = do
             return res
         _ -> return $ Right ()
 
-
--- typeCheckFuncBody n = do 
---     s <- S.get 
---     let funcValue = getFuncFromEnv s n 
---     case funcValue of 
---         Just (FunctionVal pms rt b) -> do 
---             prepareFunctionEnv pms rt
---             S.modify (\env -> removeFuncFromEnv env n)
---             res <- typeCheckBlock b
---             return $ Right ()
---         _ -> return $ Left ("Failed to find function [" ++ n ++ "] in store") -- This should never happen. TODO: force it to be impossible.
-
 synthesis :: Expression -> TypecheckerState LType  
 synthesis (Call (Name n) pms) = do 
-    functionBodyCheck <- typeCheckFuncBody n
-    case functionBodyCheck of 
-        Left l -> return $ Left ("Undefined: Undefined function " ++ n ++ "being called.")
-        Right () -> do 
-            eFType <- synth (Name n)
-            case eFType of 
-                Right fType -> synthCall fType pms 
+    eFType <- synth (Name n) 
+    case eFType of 
+        Left error -> return $ Left error 
+        Right fType -> do 
+            let res = synthCall fType pms
+            fBodyCheck <- typeCheckFuncBody n 
+            case fBodyCheck of 
                 Left error -> return $ Left error
+                Right () -> res
+    
+    
+    -- do 
+    -- functionBodyCheck <- typeCheckFuncBody n
+    -- case functionBodyCheck of 
+    --     Left l -> return $ Left ("Undefined: Undefined function " ++ n ++ " being called.")
+    --     Right () -> do 
+    --         eFType <- synth (Name n)
+    --         case eFType of 
+    --             Right fType -> synthCall fType pms 
+    --             Left error -> return $ Left error
 synthesis (Op1 uop exp) = do 
     eOpType <- synth uop
     case eOpType of 
