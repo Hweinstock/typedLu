@@ -36,6 +36,10 @@ data Environment = Environment {
 
 addTypeToEnv :: (Name, LType) -> Environment -> Environment
 addTypeToEnv (k, v) env = env {typeMap = Map.insert k v (typeMap env)}
+
+addFuncToEnv :: (Name, Value) -> Environment -> Environment
+addFuncToEnv (k, v) env = env {functionMap = Map.insert k v (functionMap env)}
+
 -- type TypecheckerState = EitherT (State EnvironmentTypes) ()  -- transformer version
 
 type TypecheckerState = State Environment (Either String ())
@@ -186,26 +190,26 @@ typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do 
     s <- S.get 
-    res <- doTypeAssignment s v t -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
+    res <- doTypeAssignment s v t exp-- Try to do type assignment, then evaluate expression type. (Recursive definitions)
     s2 <- S.get
     let tExpType = synthesis s2 exp 
     if not (tExpType <: t) then 
         --doTypeAssignment s v UnknownType -- Undo type assignment if it fails
         return $ Left (errorMsg "AssignmentError" t tExpType)
-    else doTypeAssignment s v t 
+    else doTypeAssignment s v t exp
     
-doTypeAssignment :: Environment -> Var -> LType -> TypecheckerState
-doTypeAssignment s (Name n) tExpType = do 
+doTypeAssignment :: Environment -> Var -> LType -> Expression -> TypecheckerState
+doTypeAssignment s (Name n) tExpType exp = do 
     case synth s (Name n) of 
-        NilType -> updateTypeEnv n tExpType
+        NilType -> updateEnv n tExpType exp
         UnknownType -> return $ Left "Unable to determine type of expression in assignment"
         realT -> if realT /= tExpType then 
             return $ Left "Cannot redefine variable to new type"
-            else updateTypeEnv n tExpType
-doTypeAssignment s (Dot tExp n) vExpType = 
+            else updateEnv n tExpType exp
+doTypeAssignment s (Dot tExp n) vExpType _ = 
     let tExpType = synthesis s tExp in
         return $ typecheckTableAccess (synthesis s tExp) StringType vExpType
-doTypeAssignment s (Proj tExp kExp) vExpType = do 
+doTypeAssignment s (Proj tExp kExp) vExpType _ = do 
     let kExpType = synthesis s kExp
         tExpType = synthesis s tExp in
             return $ typecheckTableAccess tExpType kExpType vExpType
@@ -218,11 +222,15 @@ typecheckTableAccess (TableType kType vType) givenKType givenVType =
 typecheckTableAccess _ _ _= Left "Unable to access value from non-table"
 
 -- | Update variable type in store. 
-updateTypeEnv :: Name -> LType -> TypecheckerState
-updateTypeEnv n t = do 
-    env <- S.get
+updateEnv :: Name -> LType -> Expression -> TypecheckerState
+updateEnv n t exp = do 
+    env <- S.get 
     S.modify (addTypeToEnv (n, t))
-    return $ Right ()
+    case (t, exp) of 
+        (FunctionType _ _, Val f) -> do 
+            S.modify (addFuncToEnv (n, f))
+            return $ Right () 
+        _ -> return $ Right ()
 
 -- | IsSubtype: Return true if first type is valid subtype of the second. 
 (<:) :: LType -> LType -> Bool 

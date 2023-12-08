@@ -3,7 +3,7 @@ module LuE2ETest where
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
 import LuEvaluator (Store, eval, initialStore, resolveVar, index, globalTableName)
-import LuTypeChecker (typeCheckAST, getTypeEnv, Environment, emptyStore, functionMap)
+import LuTypeChecker (typeCheckAST, getTypeEnv, Environment, emptyStore, functionMap, typeMap)
 import LuSyntax
 import State qualified as S
 import Data.Map qualified as Map
@@ -71,7 +71,8 @@ checkFileTypeStore fp checkFn = do
     finalStore <- typeCheckFileForStore fp 
     case finalStore of 
         (Left _) -> return $ Left "Failed to retrieve store"
-        (Right s) -> return $ checkFn s
+        (Right s) -> do 
+            return $ checkFn s
 
 
 testTypeCheckFile :: String -> Bool -> IO () 
@@ -101,7 +102,7 @@ testEvalFile fp checkFn = do
 
 testTypeCheckFileStore :: String -> (Environment -> Either String Bool) -> IO () 
 testTypeCheckFileStore fp checkFn = do 
-    res <- checkFileTypeStore fp checkFn 
+    res <- checkFileTypeStore fp checkFn
     case res of 
         Right True -> assert True 
         _ -> assert False
@@ -183,12 +184,20 @@ test_typeCheckStore =
     "tesing type checker store" ~:
         TestList 
             [
-                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (containsFunc "foo")
+                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (containsFunc "foo"), 
+                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (missingType "z" True),
+                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (missingType "z" False)
+
             ] where 
                 containsFunc :: Name -> Environment -> Either String Bool 
                 containsFunc n env = case Map.lookup n (functionMap env) of 
                     Just _ -> return True 
                     _ -> Left "Failed to find"
+
+                missingType :: Name -> Bool -> Environment -> Either String Bool 
+                missingType n flipped env = case Map.lookup n (typeMap env) of 
+                    Just _ -> return flipped 
+                    _ -> return flipped
 
 test :: IO Counts 
 test = runTestTT $ TestList [test_typeCheckStore, test_typeCheck, test_if, test_function, test_typeSig]

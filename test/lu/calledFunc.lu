@@ -3,4 +3,5 @@ function foo(x: string) : string
     return "here"
 end 
 
+y = foo("here")
 result = 10 + 2
