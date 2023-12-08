@@ -165,7 +165,6 @@ instance Synthable Var where
     synth (Proj tExp kExp) = do 
         eTableType <- synthesis tExp 
         eKeyType <- synthesis kExp 
-
         return $ case (eTableType, eKeyType) of 
             (Left l, _) -> Left l 
             (_, Left l) -> Left l
@@ -219,10 +218,21 @@ getTypeEnv b = case S.runState (typeCheckBlock b) emptyStore of
     (Right (), finalStore) -> Right finalStore
     (Left l, finalStore) -> Left l
     
--- | Generate error message with a type, expected type, and actual type. 
-errorMsg :: String -> LType -> LType -> String 
-errorMsg errorType expectedType actualType = 
-    errorType ++ ": expected type [" ++ pretty expectedType ++ "] got type [" ++ pretty actualType ++ "]" 
+throwError :: String -> LType -> Expression -> TypecheckerState () 
+throwError errorType expectedType exp = do 
+    eActualType <- synthesis exp 
+    case eActualType of 
+        Left error -> return $ Left error 
+        Right actualType -> return $ Left $ getErrorMsg expectedType actualType
+
+    where 
+        getErrorMsg expectedType actualType = 
+            errorType ++ ": expected type [" ++ pretty expectedType ++ "] got type [" ++ pretty actualType ++ "]" 
+
+-- -- | Generate error message with a type, expected type, and actual type. 
+-- errorMsg :: String -> LType -> LType -> String 
+-- errorMsg errorType expectedType actualType = 
+--     errorType ++ ": expected type [" ++ pretty expectedType ++ "] got type [" ++ pretty actualType ++ "]" 
 
 errorMsgExpected :: String -> LType -> String 
 errorMsgExpected errorType expectedType = 
@@ -268,25 +278,24 @@ typeCheckStatement (Repeat b exp) = typeCheckCondtionalBlocks exp [b] "Non-boole
 typeCheckStatement (Return exp) = do 
     curRtName <- getReturnTypeName
     eExpectedType <- synth (Name curRtName)
-    eActualType <- synthesis exp 
-    env <- S.get
-    return $ case (eExpectedType, eActualType) of 
-        (Left l, _) -> Left l 
-        (_, Left l) -> Left l
-        (Right expectedType, Right actualType) -> if actualType <: expectedType 
-            then Right () 
-            else Left (errorMsg "Return" expectedType actualType ++ show env)
+    case eExpectedType of 
+        Left error -> return $ Left error
+        Right expectedType -> do 
+            eRes <- checker exp expectedType 
+            case eRes of 
+                Left error -> return $ Left error 
+                Right False -> throwError "Return:" expectedType exp 
+                Right True -> return $ Right () 
 
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState ()
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do 
-    res <- doTypeAssignment v t exp-- Try to do type assignment, then evaluate expression type. (Recursive definitions)
-    eTExpType <- synthesis exp 
-    case eTExpType of 
-        Left l -> return $ Left l
-        Right tExpType -> if not (tExpType <: t) 
-            then return $ Left (errorMsg "AssignmentError" t tExpType)
-            else return $ Right () 
+    doTypeAssignment v t exp -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
+    eSameType <- checker exp t 
+    case eSameType of 
+        Left error -> return $ Left error 
+        Right False -> throwError "AssignmentError" t exp
+        Right True -> return $ Right ()
     
 doTypeAssignment ::  Var -> LType -> Expression -> TypecheckerState ()
 doTypeAssignment (Name n) tExpType exp = do 
@@ -347,7 +356,7 @@ synthCall (FunctionType paramType returnType) (p : ps) = do
         (Left l) -> return $ Left l
         Right False -> return $ Left (errorMsgExpected "ParameterAssignment" paramType)
         Right True -> synthCall nextFunction ps
-synthCall t _ = return $ Left (errorMsg "CallNonFunc" t (FunctionType Never AnyType))
+synthCall t _ = return $ Left ("CallNonFunc: Cannot call type [" ++ show t ++ "]")
 
 synthOp2 :: Bop -> Expression -> Expression -> TypecheckerState LType                            
 synthOp2 op e1 e2 = do 
