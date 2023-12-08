@@ -3,3 +3,5 @@ function foo() : int
 end 
 
 z = foo()
+z = foo() 
+z = foo()

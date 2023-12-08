@@ -218,25 +218,18 @@ getTypeEnv b = case S.runState (typeCheckBlock b) emptyStore of
     (Right (), finalStore) -> Right finalStore
     (Left l, finalStore) -> Left l
     
-throwError :: String -> LType -> Expression -> TypecheckerState () 
+throwError :: String -> LType -> Expression -> TypecheckerState a 
 throwError errorType expectedType exp = do 
     eActualType <- synthesis exp 
+    curStore <- S.get
     case eActualType of 
         Left error -> return $ Left error 
-        Right actualType -> return $ Left $ getErrorMsg expectedType actualType
+        Right actualType -> return $ Left $  
+            errorType ++ ": expected type \
+            \[" ++ pretty expectedType ++ "]\
+            \ got type [" ++ pretty actualType ++ "]\
+            \" ++ show curStore
 
-    where 
-        getErrorMsg expectedType actualType = 
-            errorType ++ ": expected type [" ++ pretty expectedType ++ "] got type [" ++ pretty actualType ++ "]" 
-
--- -- | Generate error message with a type, expected type, and actual type. 
--- errorMsg :: String -> LType -> LType -> String 
--- errorMsg errorType expectedType actualType = 
---     errorType ++ ": expected type [" ++ pretty expectedType ++ "] got type [" ++ pretty actualType ++ "]" 
-
-errorMsgExpected :: String -> LType -> String 
-errorMsgExpected errorType expectedType = 
-    errorType ++ ": expected type [" ++ pretty expectedType ++ "]"
 
 -- | typeCheck blocks individually, with some state. 
 typeCheckBlocks :: Environment -> [Block] -> Either String ()
@@ -354,7 +347,7 @@ synthCall (FunctionType paramType returnType) (p : ps) = do
     eRes <- checker p paramType 
     case eRes of 
         (Left l) -> return $ Left l
-        Right False -> return $ Left (errorMsgExpected "ParameterAssignment" paramType)
+        Right False -> throwError "ParameterAssignment" paramType p
         Right True -> synthCall nextFunction ps
 synthCall t _ = return $ Left ("CallNonFunc: Cannot call type [" ++ show t ++ "]")
 
@@ -376,25 +369,38 @@ synthOp2Poly op e1 e2 = do
 typeCheckFuncBody :: Name -> TypecheckerState () 
 typeCheckFuncBody n = do 
     s <- S.get 
-    let funcValue = getFuncFromEnv s n 
+    let funcValue = getFuncFromEnv s n  
     case funcValue of 
         Just (FunctionVal pms rt b) -> do 
-            prepareFunctionEnv pms rt
-            S.modify (`removeFuncFromEnv` n)
-            res <- typeCheckBlock b
-            return $ Right ()
-        _ -> return $ Left ("Failed to find function [" ++ n ++ "] in store") -- This should never happen. TODO: force it to be impossible.
+            prepareFunctionEnv pms rt 
+            S.modify (\env -> removeFuncFromEnv env n)
+            res <- typeCheckBlock b 
+            S.modify exitScope 
+            return res
+        _ -> return $ Right ()
+
+
+-- typeCheckFuncBody n = do 
+--     s <- S.get 
+--     let funcValue = getFuncFromEnv s n 
+--     case funcValue of 
+--         Just (FunctionVal pms rt b) -> do 
+--             prepareFunctionEnv pms rt
+--             S.modify (\env -> removeFuncFromEnv env n)
+--             res <- typeCheckBlock b
+--             return $ Right ()
+--         _ -> return $ Left ("Failed to find function [" ++ n ++ "] in store") -- This should never happen. TODO: force it to be impossible.
 
 synthesis :: Expression -> TypecheckerState LType  
 synthesis (Call (Name n) pms) = do 
-    typeCheckFuncBody n 
-    eFType <- synthesis (Var (Name n))
-    case eFType of 
-        Right fType -> do 
-            res <- synthCall fType pms 
-            S.modify exitScope  
-            return res
-        l@(Left _) -> return l
+    functionBodyCheck <- typeCheckFuncBody n
+    case functionBodyCheck of 
+        Left l -> return $ Left ("Undefined: Undefined function " ++ n ++ "being called.")
+        Right () -> do 
+            eFType <- synth (Name n)
+            case eFType of 
+                Right fType -> synthCall fType pms 
+                Left error -> return $ Left error
 synthesis (Op1 uop exp) = do 
     eOpType <- synth uop
     case eOpType of 

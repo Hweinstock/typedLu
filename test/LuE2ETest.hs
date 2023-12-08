@@ -146,7 +146,8 @@ test_function =
              "recFunction" ~: testEvalFile "test/lu/recFunction.lu" (checkVarValueInStore "z" (IntVal 720)), 
              "weirdScopesFunc" ~: testEvalFile "test/lu/weirdScopesFunc.lu" (checkVarValuesInStore [("result", IntVal 18), ("result2", IntVal 12)]), 
              "unionTypeFunc" ~: testEvalFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"), 
-             "function7" ~: testEvalFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)])
+             "function7" ~: testEvalFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)]), 
+             "nameShadow" ~: testEvalFile "test/lu/nameShadow.lu" (checkVarValuesInStore [("res", IntVal 10), ("s", StringVal "s")])
            ]
 test_typeSig :: Test 
 test_typeSig = 
@@ -187,7 +188,9 @@ test_typeCheck =
                 "nestedGlobal2" ~: testTypeCheckFile "test/lu/nestedGlobal2.lu" True, 
                 "nestedFuncReturnTypeGood" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeGood.lu" True, 
                 "nestedFuncReturnTypeBad" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad.lu" False,
-                "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False
+                "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False, 
+                "nameShadow" ~: testTypeCheckFile "test/lu/nameShadow.lu" True, 
+                "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False  
 
             ]
 
