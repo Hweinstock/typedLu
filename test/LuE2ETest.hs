@@ -3,7 +3,9 @@ module LuE2ETest where
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
 import LuEvaluator (Store, eval, initialStore, resolveVar, index, globalTableName)
-import LuTypeChecker (typeCheckAST, getTypeEnv, Environment, emptyStore, functionMap, getTypeFromEnv)
+import LuTypeChecker (typeCheckAST, runForContext)
+import Context (Context) 
+import Context qualified as C
 import LuSyntax
 import State qualified as S
 import Data.Map qualified as Map
@@ -21,14 +23,14 @@ runFileForStore fp = do
 
 -- | Parse and run typechecker on file to get resulting Store (or error message)
 -- TOOD: generalize with above. 
-typeCheckFileForStore :: String -> IO (Either String Environment)
+typeCheckFileForStore :: String -> IO (Either String Context)
 typeCheckFileForStore fp = do 
     parseResult <- parseLuFile fp 
     case parseResult of 
         (Left _) -> do 
             return $ Left "Failed to parse file"
         (Right ast) -> do 
-            return $ case getTypeEnv ast of 
+            return $ case runForContext ast of 
                 Right s -> Right s
                 Left m -> Left m 
 
@@ -66,7 +68,7 @@ checkFileOutputStore fp checkFn = do
         (Left _) -> return $ Left "Failed to retrieve store"
         (Right s) -> return $ checkFn s
 
-checkFileTypeStore :: String -> (Environment -> Either String Bool) -> IO (Either String Bool)
+checkFileTypeStore :: String -> (Context -> Either String Bool) -> IO (Either String Bool)
 checkFileTypeStore fp checkFn = do 
     finalStore <- typeCheckFileForStore fp 
     case finalStore of 
@@ -84,12 +86,12 @@ testTypeCheckFile fp flipped = do
             (Left l) -> assert (not flipped)
             _ -> assert flipped
 
-getTypeEnvFile :: String -> IO (Either String Environment)
+getTypeEnvFile :: String -> IO (Either String Context)
 getTypeEnvFile fp = do 
     parseResult <- parseLuFile fp 
     case parseResult of 
         (Left l) -> return $ Left l
-        Right ast -> case getTypeEnv ast of 
+        Right ast -> case runForContext ast of 
             (Left l2) -> return $ Left l2
             Right store -> return $ Right store
 
@@ -108,7 +110,7 @@ testEvalFile fp checkFn = do
         Right True -> assert True 
         _ -> assert False
 
-testTypeCheckFileStore :: String -> (Environment -> Either String Bool) -> IO () 
+testTypeCheckFileStore :: String -> (Context -> Either String Bool) -> IO () 
 testTypeCheckFileStore fp checkFn = do 
     res <- checkFileTypeStore fp checkFn
     case res of 
@@ -204,13 +206,13 @@ test_typeCheckStore =
                 "calledFunc" ~: testTypeCheckFileStore "test/lu/calledFunc.lu" (inTypeMap "z" True)
 
             ] where 
-                containsFunc :: Name -> Environment -> Either String Bool 
-                containsFunc n env = case Map.lookup n (functionMap env) of 
+                containsFunc :: Name -> Context -> Either String Bool 
+                containsFunc n env = case C.getFunc env n of 
                     Just _ -> return True 
                     _ -> Left "Failed to find"
 
-                inTypeMap :: Name -> Bool -> Environment -> Either String Bool 
-                inTypeMap n expected env = case getTypeFromEnv env n of 
+                inTypeMap :: Name -> Bool -> Context -> Either String Bool 
+                inTypeMap n expected env = case C.get env n of 
                     Just _ -> return expected 
                     _ -> return (not expected)
 

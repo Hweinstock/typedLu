@@ -51,6 +51,7 @@ library
       State
       Parser
       Stack
+      Context
   hs-source-dirs:
       src
 
