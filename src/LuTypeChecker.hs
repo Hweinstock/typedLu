@@ -46,7 +46,7 @@ contextLookup n = do
         _ -> Nothing
 
 getFromEnv :: TypeEnv -> Name -> Maybe LType 
-getFromEnv env n = let c = context env in C.get c n 
+getFromEnv env = C.get (context env)
 
 addLocalToEnv :: (Name, LType) -> TypeEnv -> TypeEnv 
 addLocalToEnv keyValuePair env = env {context = C.addLocal keyValuePair (context env)}

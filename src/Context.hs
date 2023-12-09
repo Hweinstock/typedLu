@@ -17,7 +17,7 @@ data Context a = Context {
 }
 
 data LocalVar a = LocalVar {
-    lType :: a,
+    val :: a,
     name :: Name,
     depth :: Int
 }
@@ -27,7 +27,7 @@ addGlobal (k, v) c = c {gMap = Map.insert k v (gMap c)}
 
 addLocal :: (Name, a) -> Context a -> Context a 
 addLocal (k, v) c = c {localStack = Stack.push (localStack c) lv} where 
-    lv = LocalVar {lType = v, name = k, depth = curDepth c}
+    lv = LocalVar {val = v, name = k, depth = curDepth c}
 
 getGlobal :: Context a -> Name -> Maybe a 
 getGlobal c n = Map.lookup n (gMap c)
@@ -42,10 +42,7 @@ get c n = case (getGlobal c n, getLocal c n) of
     (_, Just t) -> Just t
     (Just t, _) -> Just t 
     _ -> Nothing
-
--- lookup :: Name -> State (Context a) (Maybe a) 
--- lookup n = S.get >>= \c -> return $ get c n
-
+    
 -- | Decrease depth of scope and remove variables at this level. 
 exitScope :: Context a -> Context a
 exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
