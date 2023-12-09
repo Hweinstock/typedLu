@@ -252,8 +252,38 @@ test_stat =
         P.parse statementP "function foo(x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))), 
         P.parse statementP "foo = function (x: int, y: int): string return \"here\" end" ~?= Right (Assign (Name "foo", UnknownType) (Val (FunctionVal [("x", IntType), ("y", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) 
       ]
+test_block :: Test 
+test_block = 
+  "parsing block" ~: 
+    TestList 
+      [
+        P.parse blockP "repeat\n  until b\n (t)[1] = 1" ~?= Right (Block [Repeat (Block []) (Var (Name "b")), Assign (Proj (Var (Name "t")) (Val (IntVal 1)),UnknownType) (Val (IntVal 1))])
+      ]
+test_unit_roundtrip_stat :: Test
+test_unit_roundtrip_stat = 
+  "parsing unit tests from prop_round_trip_stat" ~: 
+    TestList 
+      [ P.parse statementP (pretty s) ~?= Right s, 
+        P.parse statementP (pretty s2) ~?= Right s2, 
+        P.parse statementP (pretty s3) ~?= Right s3, 
+        P.parse statementP (pretty s4) ~?= Right s4, 
+        P.parse statementP "if X0 then\n  else\n  repeat\n  until t.x\n  (t2)._ = _\n end" ~?= Right (If (Var (Name "X0")) (Block []) (Block [Repeat (Block []) (Var (Dot (Var (Name "t")) "x")),Assign (Dot (Var (Name "t2")) "_",UnknownType) (Var (Name "_"))]))]
+    where 
+      s = Assign (Dot (Val (StringVal "")) "x0",TableType NilType IntType) (Val (BoolVal False))
+      s2 = Assign (Name "X0",TableType (UnionType StringType StringType) IntType) (Var (Name "xy"))
+      s3 = Repeat (Block [Repeat (Block []) (Var (Name "_x")),Assign (Proj (Val (IntVal 0)) (Val (BoolVal False)),StringType) (Val (StringVal ""))]) (Var (Name "_x"))
+      s4 = If (Var (Name "x0")) (Block [Repeat (Block []) (Var (Dot (Val (StringVal "")) "xy")),Assign (Proj (Val NilVal) (Val NilVal),IntType) (TableConst [])]) (Block [])
+
+-- TODO: Edge case currently ignored. 
+-- test_tableCall :: Test 
+-- test_tableCall = 
+--   "parsing calls from tables" ~: 
+--     TestList 
+--       [
+--         P.parse expP "t[1](x)" ~?= Right (Call (Proj (Var (Name "t")) (Val (IntVal 1))) [Var (Name "x")])
+--       ]
 test :: IO Counts
-test = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp, test_typedVarP]
+test = runTestTT $ TestList [test_block, test_unit_roundtrip_stat, test_wsP, test_stringP, test_constP, test_brackets, test_stringValP, test_nameP, test_uopP, test_bopP, test_functionP, test_returnP, test_callP, test_tableConstP, test_parameterP, test_parametersP, test_lTypeP, test_ParseFiles, test_comb, test_value, test_exp, test_stat, test_typedExp, test_typedVarP]
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v

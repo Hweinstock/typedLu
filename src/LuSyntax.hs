@@ -50,7 +50,10 @@ data Value
   | StringVal String -- "abd"
   | TableVal Name -- <not used in source programs>
   | FunctionVal [Parameter] LType Block --function (v1: t1): t2
+  | ErrorVal ErrorCode
   deriving (Eq, Show)
+
+data ErrorCode = IllegalArguments | DivideByZero deriving (Eq, Show, Enum)
 
 type Parameter = (Name, LType) 
   
@@ -98,6 +101,7 @@ hashVal (BoolVal b) = hash b
 hashVal (StringVal s) = hash s 
 hashVal (TableVal n) = hash $ "table" ++ n 
 hashVal (FunctionVal ps rt b) = hash (show ps ++ show rt ++ show b)
+hashVal (ErrorVal s) = hash $ fromEnum s
 
 -- | Implement custom Ord via hasing since function values make deriving Ord difficult. 
 instance Ord Value where 
@@ -247,7 +251,8 @@ instance PP Value where
   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
   pp (TableVal t) = PP.text "<" <> PP.text t <> PP.text ">"
   pp (FunctionVal ps rt b) = PP.vcat [PP.text "function" <> PP.parens (ppParameters ps) <> PP.char ':' <> pp rt, pp b]
-
+  pp (ErrorVal s) = undefined
+  
 instance PP Parameter where 
   pp (n, t) = pp n <> PP.char ':' <> pp t
 
@@ -521,3 +526,4 @@ instance Arbitrary Value where
   shrink (StringVal s) = StringVal <$> shrinkStringLit s
   shrink (TableVal _) = []
   shrink (FunctionVal _ _ _) = []
+  shrink (ErrorVal _) = []

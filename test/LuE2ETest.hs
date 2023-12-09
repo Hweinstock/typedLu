@@ -216,5 +216,13 @@ test_typeCheckStore =
                     Just _ -> return expected 
                     _ -> return (not expected)
 
+test_error :: Test 
+test_error = 
+    "e2e error" ~: 
+        TestList 
+            [ 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal IllegalArguments)]), 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal DivideByZero)]) 
+            ]
 test :: IO Counts 
-test = runTestTT $ TestList [test_typeCheckStore, test_typeCheck, test_if, test_function, test_typeSig]
+test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]

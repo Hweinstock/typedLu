@@ -52,21 +52,22 @@ CP1:
 CP2:
 - [x] Augment parser to accept optional type signatures (Harry).
 - [x] Change evaluator to ignore type signatures. (Harry)
-- [ ] Fix parser to get round-trip propert back (Harry)
-- [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
+- [x] Fix parser to get round-trip propert back (Harry)
+- [ ] Require tables to be type annotated in type checker? 
+- [x] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [x] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
 - [ ] Outline abitrary and shrink for well-typed programs. (Wes)
 - [ ] Add additional quickCheck property for type checker about well-typed programs. (Wes)
 - [ ] Implement arbitrary and shrink for well-typed programs. (Wes)
-- [ ] Implement arbitrary and shrink for `LType`. (Harry)
+- [x] Implement arbitrary and shrink for `LType`. (Harry)
 - [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
 - [x] Add more advanced types to the parser (table, functions, unions)
 - [x] Modify evaluator to evaluate functions.
 - [x] Extend E2E tests to include type checking step. (Harry)
 - [x] Implement `checker`. 
 - [x] Implement `synthesis`.
-- [ ] Require tables to be type annotated in type checker (unsure if necessary) 
 - [x] Implement `typeCheckBlock` and `typeCheckStatement`.
+- [ ] Tweak parser (and typechecker) to allow function class straight from tables. (Harry)
 
 Potential Extensions:
 - [ ] Be able to check types within stepper. 
