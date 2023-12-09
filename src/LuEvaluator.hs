@@ -16,9 +16,26 @@ import Test.QuickCheck qualified as QC
 
 data EvalEnv = EvalEnv { 
   context :: Context Value,
-  newStore :: Store,
-  tables :: Map Value Value
+  tables :: Map Name Table
 } deriving Show
+
+toStore :: EvalEnv -> Store
+toStore env = Map.insert globalTableName gTable (tables env) where 
+  gTable = Map.mapKeys StringVal (C.gMap (context env))
+
+fromStore :: Store -> EvalEnv 
+fromStore s = case Map.lookup globalTableName s of 
+  Nothing -> emptyEvalEnv -- Shouldn't hit this cae.  
+  Just globalTable -> newEnv where 
+    newEnv = let initEnv = emptyEvalEnv in 
+      initEnv {context = C.setGMap (context initEnv) newGlobalTable, tables = newTables} 
+        where 
+          newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
+          newGlobalTable = Map.filterWithKey (\k _ -> k /= "@") (Map.mapKeys keyFunc globalTable)
+          where 
+            keyFunc (StringVal s) = s 
+            keyFunc _ = "@"
+
 
 instance PP EvalEnv where 
   pp env = undefined 
@@ -27,11 +44,8 @@ instance QC.Arbitrary EvalEnv where
   arbitrary = undefined 
   shrink = undefined
 
--- instance Eq EvalEnv where 
---   (==) a b = tables a == tables b && newStore a == newStore b && context a == context b
-
 emptyEvalEnv :: EvalEnv 
-emptyEvalEnv = EvalEnv {context = C.emptyContext, tables = Map.empty, newStore = Map.empty}
+emptyEvalEnv = EvalEnv {context = C.emptyContext, tables = Map.empty}
 
 
 type Store = Map Name Table
@@ -97,11 +111,11 @@ isReturnFlagSet = isFlagSet returnFlagName
 isHaltFlagSet :: State EvalEnv Bool 
 isHaltFlagSet = isFlagSet haltFlagName
 
-initialStore :: EvalEnv
-initialStore = emptyEvalEnv {newStore = Map.singleton globalTableName Map.empty}
+initialEnv :: EvalEnv
+initialEnv = fromStore $ Map.singleton globalTableName Map.empty
 
-extendedStore :: EvalEnv
-extendedStore = emptyEvalEnv {newStore = m} where 
+extendedEnv :: EvalEnv
+extendedEnv = fromStore m where 
   m = Map.fromList
     [ ( globalTableName,
         Map.fromList
@@ -126,7 +140,7 @@ yref :: Reference
 yref = ("_t1", StringVal "y")
 
 tableFromState :: Name -> State EvalEnv (Maybe Table)
-tableFromState tname = Map.lookup tname . newStore <$> S.get
+tableFromState tname = Map.lookup tname . toStore <$> S.get
 
 index :: Reference -> State EvalEnv Value
 index (tableName, key) = do
@@ -148,19 +162,19 @@ update (tableName, key) newVal = do
     updateEnv maybeTable env = 
       case maybeTable of 
         Nothing -> env
-        Just t -> env { newStore = Map.insert tableName (Map.insert key newVal t) (newStore env)}
+        Just t -> fromStore (Map.insert tableName (Map.insert key newVal t) (toStore env))
 
 allocateTable :: [(Value, Value)] -> State EvalEnv Value
 allocateTable assocs = do
   env <- S.get
-  let store = newStore env 
+  let store = toStore env 
   -- make a fresh name for the new table
   let n = length (Map.keys store)
   let tableName = "_t" ++ show n
   -- make sure we don't have a nil key or value
   let assocs' = filter nonNil assocs
   -- update the store
-  S.put (env {newStore = Map.insert tableName (Map.fromList assocs') store})
+  S.put (fromStore (Map.insert tableName (Map.fromList assocs') store))
   return (TableVal tableName)
 
 -- Keep nil out of the table
@@ -277,7 +291,7 @@ evalTableConst xs = do
 getTableSizeState :: String -> State EvalEnv (Maybe Int)
 getTableSizeState v =
   S.get >>= \s -> return $ do
-    targetTable <- Map.lookup v (newStore s)
+    targetTable <- Map.lookup v (toStore s)
     return $ length targetTable
 
 evalOp1 :: Uop -> Value -> State EvalEnv Value

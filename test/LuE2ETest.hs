@@ -2,7 +2,7 @@ module LuE2ETest where
 
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
-import LuEvaluator (Store, eval, initialStore, resolveVar, index, globalTableName, EvalEnv, newStore)
+import LuEvaluator (Store, eval, initialEnv, resolveVar, index, globalTableName, EvalEnv, toStore)
 import LuTypeChecker (typeCheckAST, runForContext, getUncalledFunc, TypeEnv, getFromEnv)
 import Context (Context) 
 import Context qualified as C
@@ -18,7 +18,7 @@ runFileForStore fp = do
         (Left _) -> do 
             return $ Left "Failed to parse file"
         (Right ast) -> do 
-            let finalState = S.execState (eval ast) initialStore
+            let finalState = S.execState (eval ast) initialEnv
             return $ Right finalState
 
 -- | Parse and run typechecker on file to get resulting Store (or error message)
@@ -35,7 +35,7 @@ typeCheckFileForStore fp = do
                 Left m -> Left m 
 
 checkVarProperty :: String -> (Value -> Bool) -> EvalEnv -> Either String Bool 
-checkVarProperty targetName property s = case Map.lookup globalTableName (newStore s) of 
+checkVarProperty targetName property s = case Map.lookup globalTableName (toStore s) of 
     Nothing -> Left "Failed to find global table."
     Just globalTable -> case Map.lookup (StringVal targetName) globalTable of 
         Nothing -> Left ("Failed to find" ++ targetName ++  "variable")
