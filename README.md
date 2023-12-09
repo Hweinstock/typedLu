@@ -53,6 +53,8 @@ CP2:
 - [x] Augment parser to accept optional type signatures (Harry).
 - [x] Change evaluator to ignore type signatures. (Harry)
 - [ ] Fix parser to get round-trip propert back (Harry)
+- [ ] Require tables to be type annotated in type checker? 
+- [x] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [ ] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [ ] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
 - [ ] Outline abitrary and shrink for well-typed programs. (Wes)
