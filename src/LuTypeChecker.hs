@@ -16,8 +16,8 @@ returnTypeName :: Name
 returnTypeName = "@R"
 
 data TypeEnv = TypeEnv {
-    context :: Context LType,
-    uncalledFuncs :: Map Name Value
+    uncalledFuncs :: Map Name Value, 
+    context :: Context LType
 } deriving Show 
 
 emptyTypeEnv :: TypeEnv 
@@ -171,14 +171,12 @@ runForContext b = case S.runState (typeCheckBlock b) emptyTypeEnv of
 throwError :: String -> LType -> Expression -> TypecheckerState a 
 throwError errorType expectedType exp = do 
     eActualType <- synthesis exp 
-    curStore <- S.get
     case eActualType of 
         Left error -> return $ Left error 
         Right actualType -> return $ Left $  
             errorType ++ ": expected type \
             \[" ++ pretty expectedType ++ "]\
-            \ got type [" ++ pretty actualType ++ "]\
-            \" ++ show curStore
+            \ got type [" ++ pretty actualType ++ "]"
 
 
 -- | typeCheck blocks individually, with some state. 
