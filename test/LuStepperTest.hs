@@ -2,7 +2,7 @@ module LuStepperTest where
 
 import LuSyntax
 import LuStepper
-import LuEvaluator (Store, initialStore, extendedStore, globalTableName, exec)
+import LuEvaluator (EvalEnv, initialStore, extendedStore, globalTableName, exec, newStore, Store, emptyEvalEnv)
 import State (State)
 import State qualified as S
 import Data.Map (Map, (!?))
@@ -14,7 +14,7 @@ import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 tExecStepTest :: Test
 tExecStepTest =
   "execStep wTest" ~:
-    execStep wTest initialStore
+    newStore (execStep wTest initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList [(StringVal "x", IntVal 0), (StringVal "y", IntVal 10)]
@@ -25,14 +25,14 @@ tExecStepTest =
 tExecStepAbs :: Test
 tExecStepAbs =
   "execStep wAbs" ~:
-    execStep wAbs initialStore
+    newStore (execStep wAbs initialStore)
       ~?= Map.fromList [(globalTableName, Map.fromList [(StringVal "x", IntVal 3)])]
 
 -- | times.lu: multiplication of 3 * 10 by repeated addition
 tExecStepTimes :: Test
 tExecStepTimes =
   "execStep wTimes" ~:
-    execStep wTimes initialStore
+    newStore (execStep wTimes initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList [(StringVal "x", IntVal 0), (StringVal "y", IntVal 3), (StringVal "z", IntVal 30)]
@@ -43,7 +43,7 @@ tExecStepTimes =
 tExecStepFact :: Test
 tExecStepFact =
   "execStep wFact" ~:
-    execStep wFact initialStore
+    newStore (execStep wFact initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList [(StringVal "f", IntVal 120), (StringVal "n", IntVal 0), (StringVal "x", IntVal 1), (StringVal "z", IntVal 120)]
@@ -54,7 +54,7 @@ tExecStepFact =
 tExecStepTable :: Test
 tExecStepTable =
   "execStep wTable" ~:
-    execStep wTable initialStore
+    newStore (execStep wTable initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList
@@ -77,7 +77,7 @@ tExecStepBfs =
       [ global !? StringVal "found" ~?= Just (BoolVal True)
       ]
   where
-    ss = execStep wBfs initialStore
+    ss = newStore (execStep wBfs initialStore)
     global = case ss !? globalTableName of
       Just g -> g
       Nothing -> Map.empty
@@ -87,7 +87,7 @@ test_step_with_errors =
   "exec with errors" ~: 
     TestList 
       [
-        exec b initialStore ~?= snd (S.runState (boundedStep 100 b) initialStore)
+        newStore (exec b initialStore) ~?= newStore (S.execState (boundedStep 100 b) initialStore)
       ]
       where 
           b = Block [If (Op1 Neg (Var (Name "x"))) (Block []) (Block []),If (TableConst []) (Block []) (Block [])]
@@ -97,14 +97,14 @@ test = runTestTT $ TestList [test_step_with_errors, tExecStepFact, tExecStepAbs,
 
 prop_stepExec :: Block -> QC.Property
 prop_stepExec b =
-  not (final b) QC.==> final b1 QC.==> m1 == m2
+  not (final b) QC.==> final b1 QC.==> newStore m1 == newStore m2
   where
     (b1, m1) = S.runState (boundedStep 100 b) initialStore
     m2 = exec b initialStore
 
 -- | Make sure that we can step every block in every store
 prop_step_total :: Block -> Store -> Bool
-prop_step_total b s = case S.runState (step b) s of
+prop_step_total b s = case S.runState (step b) (emptyEvalEnv {newStore = s}) of
   (b', s') -> True
 
 qc :: IO () 

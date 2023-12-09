@@ -22,7 +22,7 @@ test_index =
         S.evalState (index yref) extendedStore ~?= BoolVal True,
         S.evalState (index ("z", NilVal)) extendedStore ~?= NilVal,
         -- Updates using the `nil` key are ignored
-        S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore ~?= extendedStore,
+        newStore (S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore) ~?= newStore (extendedStore),
         S.evalState (index (globalTableName, StringVal "t")) extendedStore ~?= TableVal "_t1"
       ]
 
@@ -88,51 +88,41 @@ test_tableConst :: Test
 test_tableConst =
   "evaluate { x = 3 } " ~:
     TestList
-      [ S.runState
+      [ newStore (S.execState
           (evalE (TableConst [FieldName "x" (Val (IntVal 3))]))
-          initialStore
-          ~?= ( TableVal "_t1",
-                Map.fromList
+          initialStore)
+          ~?= Map.fromList
                   [ ("_G", Map.empty),
                     ("_t1", Map.fromList [(StringVal "x", IntVal 3)])
-                  ]
-              ),
-        S.runState
+                  ],
+        newStore (S.execState
           (evalE (TableConst [FieldName "x" (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
-          initialStore
-          ~?= ( TableVal "_t1",
-                Map.fromList
+          initialStore)
+          ~?= Map.fromList
                   [ ("_G", Map.empty),
                     ("_t1", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
-                  ]
-              ),
-        S.runState
+                  ],
+        newStore (S.execState
           (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3))]))
-          initialStore
-          ~?= ( TableVal "_t1",
-                Map.fromList
+          initialStore)
+          ~?= Map.fromList
                   [ ("_G", Map.empty),
                     ("_t1", Map.fromList [(StringVal "x", IntVal 3)])
-                  ]
-              ),
-        S.runState
+                  ],
+        newStore (S.execState
           (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
-          initialStore
-          ~?= ( TableVal "_t1",
-                Map.fromList
+          initialStore)
+          ~?= Map.fromList
                   [ ("_G", Map.empty),
                     ("_t1", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
-                  ]
-              ),
-        S.runState
+                  ],
+        newStore (S.execState
           (evalE (TableConst []))
-          initialStore
-          ~?= ( TableVal "_t1",
-                Map.fromList
+          initialStore)
+          ~?= Map.fromList
                   [ ("_G", Map.empty),
                     ("_t1", Map.empty)
                   ]
-              )
       ]
 
 test_evalOp2 :: Test
@@ -183,13 +173,13 @@ test_error =
 tExecTest :: Test
 tExecTest =
   "exec wTest" ~:
-    exec wTest initialStore
+    newStore (exec wTest initialStore)
       ~?= Map.fromList [(globalTableName, Map.fromList [(StringVal "x", IntVal 0), (StringVal "y", IntVal 10)])]
 
 tExecFact :: Test
 tExecFact =
   "exec wFact" ~:
-    exec wFact initialStore
+    newStore (exec wFact initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList
@@ -204,7 +194,7 @@ tExecFact =
 tExecAbs :: Test
 tExecAbs =
   "exec wAbs" ~:
-    exec wAbs initialStore
+    newStore (exec wAbs initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList [(StringVal "x", IntVal 3)]
@@ -214,7 +204,7 @@ tExecAbs =
 tExecTimes :: Test
 tExecTimes =
   "exec wTimes" ~:
-    exec wTimes initialStore
+    newStore (exec wTimes initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList [(StringVal "x", IntVal 0), (StringVal "y", IntVal 3), (StringVal "z", IntVal 30)]
@@ -224,7 +214,7 @@ tExecTimes =
 tExecTable :: Test
 tExecTable =
   "exec wTable" ~:
-    exec wTable initialStore
+    newStore (exec wTable initialStore)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList
@@ -241,16 +231,16 @@ tExecTable =
 tExecBfs :: Test
 tExecBfs = "exec wBfs" ~: TestList [global !? StringVal "found" ~?= Just (BoolVal True)]
   where
-    ss = exec wBfs initialStore
+    ss = newStore (exec wBfs initialStore)
     global = case ss !? globalTableName of
       Just g -> g
       Nothing -> Map.empty
 
 test :: IO Counts
-test = runTestTT $ TestList [test_error, test_index, test_update, test_resolveVar, test_evaluateNot, test_evaluateLen, test_tableConst, test_evalOp2, tExecTest, tExecFact, tExecAbs, tExecTimes, tExecTable, tExecBfs]
+test = runTestTT $ TestList [test_error, test_index, test_update, test_resolveVar, test_evaluateNot, test_evaluateLen, test_tableConst, test_evalOp2, tExecTest, tExecAbs, tExecTimes, tExecTable, tExecBfs, tExecFact]
 
 prop_evalE_total :: Expression -> Store -> Bool
-prop_evalE_total e s = case evaluate e s of
+prop_evalE_total e s = case evaluate e (emptyEvalEnv {newStore = s}) of
   NilVal -> True
   IntVal i -> i `seq` True
   BoolVal b -> b `seq` True

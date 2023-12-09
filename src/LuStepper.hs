@@ -14,7 +14,7 @@ import Data.Map qualified as Map
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 
-step :: Block -> State Store Block
+step :: Block -> State EvalEnv Block
 step b@(Block []) = return b
 step b@(Block (s:ss)) = continueWithFlags (Block ss) (doStep b) where 
   doStep (Block ((If e (Block ss1) (Block ss2)) : otherSs)) = do
@@ -35,13 +35,13 @@ step b@(Block (s:ss)) = continueWithFlags (Block ss) (doStep b) where
   doStep b@(Block []) = return b
 
 -- | Evaluate this block for a specified number of steps
-boundedStep :: Int -> Block -> State Store Block
+boundedStep :: Int -> Block -> State EvalEnv Block
 boundedStep 0 b = return b
 boundedStep _ b | final b = return b
 boundedStep n b = step b >>= boundedStep (n - 1)
 
 -- | Evaluate this block for a specified number of steps, using the specified store
-steps :: Int -> Block -> Store -> (Block, Store)
+steps :: Int -> Block -> EvalEnv -> (Block, EvalEnv)
 steps n block = S.runState (boundedStep n block)
 
 -- | Is this block completely evaluated?
@@ -49,18 +49,18 @@ final :: Block -> Bool
 final (Block []) = True
 final _ = False
 
-allStep :: Block -> State Store Block
+allStep :: Block -> State EvalEnv Block
 allStep b | final b = return b
 allStep b = step b >>= allStep
 
 -- | Evaluate this block to completion
-execStep :: Block -> Store -> Store
+execStep :: Block -> EvalEnv -> EvalEnv
 execStep b = S.execState (allStep b)
 
 data Stepper = Stepper
   { filename :: Maybe String,
     block :: Block,
-    store :: Store,
+    env :: EvalEnv,
     history :: Maybe Stepper
   }
 
@@ -69,14 +69,14 @@ initialStepper =
   Stepper
     { filename = Nothing,
       block = mempty,
-      store = initialStore,
+      env = emptyEvalEnv,
       history = Nothing
     }
 
 stepForward :: Stepper -> Stepper
 stepForward ss =
-  let (curBlock, curStore) = steps 1 (block ss) (store ss)
-   in ss {block = curBlock, store = curStore, history = Just ss}
+  let (curBlock, curEnv) = steps 1 (block ss) (env ss)
+   in ss {block = curBlock, env = curEnv, history = Just ss}
 
 stepForwardN :: Stepper -> Int -> Stepper
 stepForwardN ss 0 = ss
@@ -118,14 +118,14 @@ stepper = go initialStepper
               go (ss {filename = Just fn, block = b})
         -- dump the store
         Just (":d", _) -> do
-          putStrLn (pretty (store ss))
+          putStrLn (pretty (env ss))
           go ss
         -- quit the stepper
         Just (":q", _) -> return ()
         -- run current block to completion
         Just (":r", _) ->
-          let s' = exec (block ss) (store ss)
-           in go ss {block = mempty, store = s', history = Just ss}
+          let s' = exec (block ss) (env ss)
+           in go ss {block = mempty, env = s', history = Just ss}
         -- next statement (could be multiple)
         Just (":n", strs) -> do
           let numSteps :: Int
@@ -154,7 +154,7 @@ stepper = go initialStepper
         -- evaluate an expression in the current state
         _ -> case LuParser.parseLuExp str of
           Right exp -> do
-            let v = evaluate exp (store ss)
+            let v = evaluate exp (env ss)
             putStrLn (pretty v)
             go ss
           Left _s -> do
