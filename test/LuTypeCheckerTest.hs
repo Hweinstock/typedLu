@@ -8,10 +8,10 @@ import Data.Map qualified as Map
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import LuEvaluator (Store)
-import Context (Context, gMap, empty)
+import Context
 
-store :: Context
-store  = empty {gMap = typeMap} where 
+store :: TypeContext
+store = setGMap emptyTypeContext typeMap where 
   typeMap = Map.fromList
     [ ("int", IntType),
       ("string", StringType),
@@ -296,7 +296,7 @@ test_typeCheckStatement =
     "typechecking statement" ~: 
         TestList 
             [
-                S.evalState (typeCheckStatement (Assign (Name "f",FunctionType IntType StringType) (Val (FunctionVal [("a",IntType)] StringType (Block [Return (Val (StringVal "here"))]))))) empty ~?= Right ()
+                S.evalState (typeCheckStatement (Assign (Name "f",FunctionType IntType StringType) (Val (FunctionVal [("a",IntType)] StringType (Block [Return (Val (StringVal "here"))]))))) emptyTypeContext ~?= Right ()
             ]
 
 
