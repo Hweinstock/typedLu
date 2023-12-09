@@ -50,6 +50,8 @@ library
       LuTypes
       State
       Parser
+      Stack
+      Context
   hs-source-dirs:
       src
 
@@ -76,6 +78,7 @@ test-suite project-cis5520-test
       LuParserTest
       LuEvaluatorTest
       LuStepperTest
+      LuTypeCheckerTest
       LuE2ETest
   hs-source-dirs:
       test

@@ -1,0 +1,7 @@
+function foo(x: string) : string 
+    z = 5 
+    return "here"
+end 
+
+y = foo("here")
+result = 10 + 2

@@ -1,0 +1,15 @@
+function outer(x : int) : int 
+    z = x + 3 
+    
+    function inner(x : int) : string 
+        if x == 5 then 
+            return "five"
+        else 
+            return "notFive"
+        end 
+    end 
+    res = inner(z)
+    return res
+end
+
+result = outer(2)

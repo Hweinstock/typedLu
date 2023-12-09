@@ -20,10 +20,10 @@ globalTableName :: Name
 globalTableName = "_G"
 
 returnValueName :: Name 
-returnValueName = "_R"
+returnValueName = "@R"
 
 returnFlagName :: Name 
-returnFlagName = "_F"
+returnFlagName = "@F"
 
 haltFlagName :: Name 
 haltFlagName = "_H"

@@ -1,0 +1,7 @@
+z = 5 
+function foo(x : int) : int
+    x = 3
+    return 1
+end 
+
+one = foo(z)

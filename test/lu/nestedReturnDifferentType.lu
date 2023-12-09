@@ -1,0 +1,14 @@
+function foo(x : int) : int 
+
+    function bar() : string 
+        return "here"
+    end 
+
+    if bar() == "here" then
+        return 3
+    else 
+        return 1
+    end 
+end 
+
+result = foo(5)

@@ -1,0 +1,13 @@
+s = "not this"
+
+function o(x : int) : int 
+
+    function i(x : string) : string 
+        return x 
+    end 
+
+    s = i("s")
+    return x 
+end 
+
+res = o(10)

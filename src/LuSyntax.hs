@@ -60,7 +60,7 @@ type Parameter = (Name, LType)
 data Uop
   = Neg -- `-` :: Int -> Int
   | Not -- `not` :: a -> Bool
-  | Len -- `#` :: String -> Int / Table -> Int
+  | Len -- `#` :: String | Int | Table -> Int
   deriving (Eq, Show, Enum, Bounded)
 
 data Bop
@@ -94,18 +94,18 @@ var :: String -> Expression
 var = Var . Name
 
 -- | Helper function to hash value data types. 
-hashV :: Value -> Int 
-hashV NilVal = hash "NilVal"
-hashV (IntVal i) = hash i
-hashV (BoolVal b) = hash b
-hashV (StringVal s) = hash s 
-hashV (TableVal n) = hash $ "table" ++ n 
-hashV (FunctionVal ps rt b) = hash (show ps ++ show rt ++ show b)
-hashV (ErrorVal s) = hash $ fromEnum s
+hashVal :: Value -> Int 
+hashVal NilVal = hash "NilVal"
+hashVal (IntVal i) = hash i
+hashVal (BoolVal b) = hash b
+hashVal (StringVal s) = hash s 
+hashVal (TableVal n) = hash $ "table" ++ n 
+hashVal (FunctionVal ps rt b) = hash (show ps ++ show rt ++ show b)
+hashVal (ErrorVal s) = hash $ fromEnum s
 
 -- | Implement custom Ord via hasing since function values make deriving Ord difficult. 
 instance Ord Value where 
-  v1 `compare` v2 = hashV v1 `compare` hashV v2
+  v1 `compare` v2 = hashVal v1 `compare` hashVal v2
 
 -- test.lu
 wTest :: Block
@@ -250,8 +250,11 @@ instance PP Value where
   pp NilVal = PP.text "nil"
   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
   pp (TableVal t) = PP.text "<" <> PP.text t <> PP.text ">"
-  pp (FunctionVal ps rt b) = undefined
+  pp (FunctionVal ps rt b) = PP.vcat [PP.text "function" <> PP.parens (ppParameters ps) <> PP.char ':' <> pp rt, pp b]
   pp (ErrorVal s) = undefined
+  
+instance PP Parameter where 
+  pp (n, t) = pp n <> PP.char ':' <> pp t
 
 isBase :: Expression -> Bool
 isBase TableConst {} = True
@@ -285,7 +288,7 @@ instance PP Expression where
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
   pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
-  pp (Call fv ps) = undefined
+  pp (Call fv ps) = pp fv <> PP.parens (PP.hsep(map pp ps))
 
 instance PP TableField where
   pp (FieldName name e) = pp name <+> PP.equals <+> pp e
@@ -297,6 +300,9 @@ instance PP Block where
 
 ppSS :: [Statement] -> Doc
 ppSS ss = PP.vcat (map pp ss)
+
+ppParameters :: [Parameter] -> Doc 
+ppParameters ps = PP.hsep (map pp ps) 
 
 instance PP Statement where
   pp (Assign x e) = pp x <+> PP.equals <+> pp e
@@ -311,7 +317,7 @@ instance PP Statement where
   pp (Repeat b e) =
     PP.hang (PP.text "repeat") 2 (pp b)
       PP.$+$ PP.text "until" <+> pp e
-  pp (Return e) = undefined
+  pp (Return e) = PP.text "return" <+> pp e
 
 level :: Bop -> Int
 level Times = 7

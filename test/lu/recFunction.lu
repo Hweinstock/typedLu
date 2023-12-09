@@ -4,6 +4,6 @@ function factorial(x: int) : int
     else 
         return x * factorial(x-1)
     end 
-end
+end 
 
 z = factorial(6)
