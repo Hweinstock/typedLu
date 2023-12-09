@@ -82,14 +82,24 @@ tExecStepBfs =
       Just g -> g
       Nothing -> Map.empty
 
+test_step_with_errors :: Test 
+test_step_with_errors = 
+  "exec with errors" ~: 
+    TestList 
+      [
+        exec b initialStore ~?= snd (S.runState (boundedStep 100 b) initialStore)
+      ]
+      where 
+          b = Block [If (Op1 Neg (Var (Name "x"))) (Block []) (Block []),If (TableConst []) (Block []) (Block [])]
+
 test :: IO Counts
-test = runTestTT $ TestList [tExecStepFact, tExecStepAbs, tExecStepTimes, tExecStepAbs, tExecStepTable, tExecStepBfs]
+test = runTestTT $ TestList [test_step_with_errors, tExecStepFact, tExecStepAbs, tExecStepTimes, tExecStepAbs, tExecStepTable, tExecStepBfs]
 
 prop_stepExec :: Block -> QC.Property
 prop_stepExec b =
   not (final b) QC.==> final b1 QC.==> m1 == m2
   where
-    (b1, m1) = S.runState (boundedStep 10 b) initialStore
+    (b1, m1) = S.runState (boundedStep 100 b) initialStore
     m2 = exec b initialStore
 
 -- | Make sure that we can step every block in every store

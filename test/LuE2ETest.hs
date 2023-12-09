@@ -94,6 +94,13 @@ test_typeSig =
                 "typeSig2" ~: testFile "test/lu/typeSig2.lu" (checkVarExistsInStore "f" >> checkVarExistsInStore "u")
             ]
 
-
+test_error :: Test 
+test_error = 
+    "e2e error" ~: 
+        TestList 
+            [ 
+                "IllegalArguments1" ~: testFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal IllegalArguments)]), 
+                "IllegalArguments1" ~: testFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal DivideByZero)]) 
+            ]
 test :: IO Counts 
-test = runTestTT $ TestList [test_if, test_function, test_typeSig]
+test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]
