@@ -50,7 +50,10 @@ data Value
   | StringVal String -- "abd"
   | TableVal Name -- <not used in source programs>
   | FunctionVal [Parameter] LType Block --function (v1: t1): t2
+  | ErrorVal ErrorCode
   deriving (Eq, Show)
+
+data ErrorCode = IllegalArguments | DivideByZero deriving (Eq, Show, Enum)
 
 type Parameter = (Name, LType) 
   
@@ -98,6 +101,7 @@ hashV (BoolVal b) = hash b
 hashV (StringVal s) = hash s 
 hashV (TableVal n) = hash $ "table" ++ n 
 hashV (FunctionVal ps rt b) = hash (show ps ++ show rt ++ show b)
+hashV (ErrorVal s) = hash $ fromEnum s
 
 -- | Implement custom Ord via hasing since function values make deriving Ord difficult. 
 instance Ord Value where 
@@ -229,7 +233,7 @@ instance PP LType where
   pp IntType = PP.text "int"
   pp StringType = PP.text "string"
   pp BooleanType = PP.text "boolean"
-  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ',' <> pp t2)
+  pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ':' <> pp t2)
   pp (UnionType t1 t2) = pp t1 <> PP.char '|' <> pp t2 
   pp (FunctionType t1 t2) = pp t1 <> PP.text "->" <> pp t2
 
@@ -247,6 +251,7 @@ instance PP Value where
   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
   pp (TableVal t) = PP.text "<" <> PP.text t <> PP.text ">"
   pp (FunctionVal ps rt b) = undefined
+  pp (ErrorVal s) = undefined
 
 isBase :: Expression -> Bool
 isBase TableConst {} = True
@@ -515,3 +520,4 @@ instance Arbitrary Value where
   shrink (StringVal s) = StringVal <$> shrinkStringLit s
   shrink (TableVal _) = []
   shrink (FunctionVal _ _ _) = []
+  shrink (ErrorVal _) = []

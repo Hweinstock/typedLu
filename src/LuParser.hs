@@ -125,13 +125,16 @@ reserved =
     "while"
   ]
 
-nameP :: Parser Name
-nameP = P.filter (`notElem` reserved) parseAnyName
+noSpaceNameP :: Parser Name
+noSpaceNameP = P.filter (`notElem` reserved) parseAnyName
   where
     parseAnyName :: Parser Name
     parseAnyName =
       let alphaOrUnderScore = (P.alpha <|> P.char '_')
-       in wsP ((:) <$> alphaOrUnderScore <*> many (P.digit <|> alphaOrUnderScore))
+       in (:) <$> alphaOrUnderScore <*> many (P.digit <|> alphaOrUnderScore)
+
+nameP :: Parser Name 
+nameP = wsP noSpaceNameP
 
 uopP :: Parser Uop
 uopP = wsP (parseNeg <|> parseLen <|> parseNot)
@@ -166,7 +169,7 @@ parametersP = parens $ P.sepBy parameterP (wsP (P.char ','))
 lTypeP :: Parser LType 
 lTypeP = liftA2 UnionType baseTypeP (afterP "|" lTypeP)
  <|> liftA2 FunctionType baseTypeP (afterP "->" lTypeP)
- <|> liftA2 TableType (afterP "{" (baseTypeP <|> lTypeP)) (afterP ":" lTypeP) <* stringP "}"
+ <|> liftA2 TableType (afterP "{" lTypeP) (afterP ":" lTypeP) <* stringP "}"
  <|> baseTypeP
  where 
   baseTypeP :: Parser LType 
@@ -178,8 +181,9 @@ lTypeP = liftA2 UnionType baseTypeP (afterP "|" lTypeP)
 functionValP :: Parser Value 
 functionValP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
 
+-- TODO: this currently doesn't allow calling functions straight from tables. 
 callP :: Parser Expression
-callP = liftA2 Call varP (parens (P.sepBy expP (wsP (P.char ','))))
+callP = liftA2 Call (Name <$> noSpaceNameP) (parens (P.sepBy expP (wsP (P.char ','))))
 
 returnP :: Parser Statement 
 returnP = Return <$> (afterP "return" expP) 

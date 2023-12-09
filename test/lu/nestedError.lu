@@ -1,0 +1,11 @@
+z = 5
+r : int | string = 1 
+
+if true then 
+    r = 1 
+else 
+    r = "1"
+end
+result = z + r
+
+
