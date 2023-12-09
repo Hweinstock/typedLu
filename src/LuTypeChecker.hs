@@ -364,4 +364,3 @@ runSynthesis env exp = case S.evalState (synthesis exp) env of
 -- | Check that type of given expression is an instance of given type. 
 runChecker :: TypeEnv -> Expression -> LType -> Bool
 runChecker env e = (<:) (runSynthesis env e)
-

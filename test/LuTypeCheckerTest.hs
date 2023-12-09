@@ -101,7 +101,8 @@ test_checkerVal =
                 runChecker store (Val (IntVal 0)) BooleanType ~?= False,
                 runChecker store (Val (FunctionVal [("x", IntType)] StringType (Block []))) (FunctionType IntType StringType) ~?= True,
                 runChecker store (Val (FunctionVal [("x", StringType)] StringType (Block []))) (FunctionType IntType StringType) ~?= False,
-                runChecker store (Val (FunctionVal [("x", IntType)] IntType (Block []))) (FunctionType IntType StringType) ~?= False
+                runChecker store (Val (FunctionVal [("x", IntType)] IntType (Block []))) (FunctionType IntType StringType) ~?= False, 
+                runChecker store (Val (StringVal "")) (UnionType StringType IntType) ~?= True
             ]
 
 -- Test runChecker function with Op1 as input
@@ -115,7 +116,8 @@ test_checkerOp1 =
                 runChecker store (Op1 Not (Var (Name "boolean"))) BooleanType ~?= True,
                 runChecker store (Op1 Not (Var (Name "int"))) BooleanType ~?= True,
                 runChecker store (Op1 Len (Var (Name "string"))) IntType ~?= True,
-                runChecker store (Op1 Len (Var (Name "int"))) IntType ~?= True
+                runChecker store (Op1 Len (Var (Name "int"))) IntType ~?= True, 
+                runChecker store (Op1 Not (Val NilVal)) (UnionType IntType BooleanType) ~?= True
             ]
 
 -- Test runChecker function with Op2 as input
@@ -309,7 +311,7 @@ test = runTestTT $ TestList [test_typeCheckStatement, test_isSubtype, test_check
 
 -- Quickcheck property for runChecker function
 prop_checker :: Expression -> LType -> Bool
-prop_checker e t = runChecker store e t == (runSynthesis store e == t)
+prop_checker e t = runChecker store e t == (runSynthesis store e <: t)
 
 -- Quickcheck property for synthesis function
 prop_synthesis :: Expression -> Bool
