@@ -34,7 +34,7 @@ getGlobal c n = Map.lookup n (gMap c)
 
 getLocal :: Context a -> Name -> Maybe a 
 getLocal c n = case Stack.peekUntil (localStack c) (\lv -> name lv == n) of 
-    Just lv -> Just $ lType lv 
+    Just lv -> Just $ val lv 
     _ -> Nothing
 
 get :: Context a -> Name -> Maybe a 
@@ -42,7 +42,7 @@ get c n = case (getGlobal c n, getLocal c n) of
     (_, Just t) -> Just t
     (Just t, _) -> Just t 
     _ -> Nothing
-    
+
 -- | Decrease depth of scope and remove variables at this level. 
 exitScope :: Context a -> Context a
 exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
@@ -61,7 +61,7 @@ emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0
 
 instance Show a => Show (LocalVar a) where 
     show :: LocalVar a -> String 
-    show lv = show (name lv) ++ "=" ++ show (lType lv) ++ ":" ++ show (depth lv)
+    show lv = show (name lv) ++ "=" ++ show (val lv) ++ ":" ++ show (depth lv)
 
 instance Show a => Show (Context a) where 
     show :: Context a -> String 
