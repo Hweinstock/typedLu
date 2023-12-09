@@ -62,11 +62,11 @@ CP2:
 - [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
 - [x] Add more advanced types to the parser (table, functions, unions)
 - [x] Modify evaluator to evaluate functions.
-- [ ] Extend E2E tests to include type checking step. (Harry)
-- [ ] Implement `checker`. 
-- [ ] Implement `synthesis`.
+- [x] Extend E2E tests to include type checking step. (Harry)
+- [x] Implement `checker`. 
+- [x] Implement `synthesis`.
 - [ ] Require tables to be type annotated in type checker (unsure if necessary) 
-- [ ] Implement `typeCheckBlock` and `typeCheckStatement`.
+- [x] Implement `typeCheckBlock` and `typeCheckStatement`.
 
 Potential Extensions:
 - [ ] Be able to check types within stepper. 
