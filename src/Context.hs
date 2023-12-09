@@ -9,60 +9,12 @@ import LuSyntax
 import State (State)
 import qualified State as S
 
-class Environment env where 
-    getContext :: env -> Context
-    setContext :: env -> Context -> env 
 
-    emptyEnv :: env 
-
-    addGlobal :: (Name, LType) -> env -> env 
-    addGlobal (k, v) env = let c = getContext env in setContext env $ c {gMap = Map.insert k v (gMap c)}
-
-    addLocal :: (Name, LType) -> env -> env
-    addLocal (k, v) env = let c = getContext env in setContext env $ c {localStack = Stack.push (localStack c) lv} where 
-        lv = LocalVar {lType = v, name = k, depth = curDepth (getContext env)}
-    
-    getGlobal :: env -> Name -> Maybe LType 
-    getGlobal env n = let c = getContext env in Map.lookup n (gMap c)
-
-    getLocal :: env -> Name -> Maybe LType 
-    getLocal env n = let c = getContext env in case Stack.peekUntil (localStack c) (\lv -> name lv == n) of 
-        Just lv -> Just $ lType lv 
-        _ -> Nothing
-
-    get :: env -> Name -> Maybe LType 
-    get env n = case (getGlobal env n, getLocal env n) of 
-        (_, Just t) -> Just t
-        (Just t, _) -> Just t 
-        _ -> Nothing
-
-    lookup :: Name -> State env (Maybe LType) 
-    lookup n = S.get >>= \env -> return $ get env n
-
-    -- | Decrease depth of scope and remove variables at this level. 
-    exitScope :: env -> env
-    exitScope env = let c = getContext env in setContext env $ c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
-        aboveDepth :: Int -> LocalVar a -> Bool 
-        aboveDepth n lv = depth lv < curDepth (getContext env)
-
-    -- | Increase depth of scope. 
-    enterScope :: env -> env 
-    enterScope env = let c = getContext env in setContext env $ c {curDepth = curDepth c + 1}
-
-    setGMap :: env -> Map Name LType -> env 
-    setGMap env m = let c = getContext env in setContext env $ c {gMap = m}
-
-
-data Context = Context {
-    gMap :: Map Name LType, 
-    localStack :: Stack (LocalVar LType),  
+data Context a = Context {
+    gMap :: Map Name a, 
+    localStack :: Stack (LocalVar a),  
     curDepth :: Int
 }
-
-instance Environment Context where 
-    getContext = id 
-    setContext _ = id 
-    emptyEnv = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
 
 data LocalVar a = LocalVar {
     lType :: a,
@@ -70,11 +22,51 @@ data LocalVar a = LocalVar {
     depth :: Int
 }
 
+addGlobal :: (Name, a) -> Context a -> Context a
+addGlobal (k, v) c = c {gMap = Map.insert k v (gMap c)}
+
+addLocal :: (Name, a) -> Context a -> Context a 
+addLocal (k, v) c = c {localStack = Stack.push (localStack c) lv} where 
+    lv = LocalVar {lType = v, name = k, depth = curDepth c}
+
+getGlobal :: Context a -> Name -> Maybe a 
+getGlobal c n = Map.lookup n (gMap c)
+
+getLocal :: Context a -> Name -> Maybe a 
+getLocal c n = case Stack.peekUntil (localStack c) (\lv -> name lv == n) of 
+    Just lv -> Just $ lType lv 
+    _ -> Nothing
+
+get :: Context a -> Name -> Maybe a 
+get c n = case (getGlobal c n, getLocal c n) of 
+    (_, Just t) -> Just t
+    (Just t, _) -> Just t 
+    _ -> Nothing
+
+-- lookup :: Name -> State (Context a) (Maybe a) 
+-- lookup n = S.get >>= \c -> return $ get c n
+
+-- | Decrease depth of scope and remove variables at this level. 
+exitScope :: Context a -> Context a
+exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
+    aboveDepth :: Int -> LocalVar a -> Bool 
+    aboveDepth n lv = depth lv < curDepth c
+
+-- | Increase depth of scope. 
+enterScope :: Context a -> Context a
+enterScope c = c {curDepth = curDepth c + 1}
+
+setGMap :: Context a -> Map Name a -> Context a
+setGMap c m = c {gMap = m}
+
+emptyContext :: Context a 
+emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
+
 instance Show a => Show (LocalVar a) where 
     show :: LocalVar a -> String 
     show lv = show (name lv) ++ "=" ++ show (lType lv) ++ ":" ++ show (depth lv)
 
-instance Show Context where 
-    show :: Context -> String 
+instance Show a => Show (Context a) where 
+    show :: Context a -> String 
     show env = show (gMap env) ++ "\n" ++ show (localStack env) ++ "\n" ++ "[depth=" ++ show (curDepth env) ++ "]"
     
