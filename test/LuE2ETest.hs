@@ -94,16 +94,6 @@ test_typeSig =
                 "typeSig2" ~: testFile "test/lu/typeSig2.lu" (checkVarExistsInStore "f" >> checkVarExistsInStore "u")
             ]
 
-
-test_typeSig :: Test 
-test_typeSig = 
-    "e2e typeSig" ~: 
-        TestList 
-            [
-                "typeSig" ~: testFile "test/lu/typeSig.lu" (checkVarValuesInStore [("x", IntVal 5), ("x2", IntVal 5), ("s", StringVal "hello"), ("s2", StringVal "hello"), ("z", BoolVal True), ("z2", BoolVal True)]), 
-                "typeSig2" ~: testFile "test/lu/typeSig2.lu" (checkVarExistsInStore "f" >> checkVarExistsInStore "u")
-            ]
-
 test_error :: Test 
 test_error = 
     "e2e error" ~: 
