@@ -1,5 +1,8 @@
 module LuTypes where
+
+import Control.Applicative (liftA2)
 import Test.QuickCheck (Arbitrary (..), Gen)
+import qualified Test.QuickCheck as QC
 
 
 
@@ -18,7 +21,18 @@ data LType =
 
 instance Arbitrary LType where
     arbitrary :: Gen LType
-    arbitrary = undefined
+    arbitrary = let base = 3 in QC.frequency [
+        (0, return Never), 
+        (base, arbitraryBase), 
+        (1, liftA2 TableType arbitrary arbitrary), 
+        (1, liftA2 UnionType arbitraryBase arbitrary), 
+        (1, liftA2 FunctionType arbitraryBase arbitrary)]
+        where 
+            arbitraryBase :: Gen LType 
+            arbitraryBase = QC.elements [NilType, IntType, StringType, BooleanType]
 
     shrink :: LType -> [LType]
-    shrink = undefined
+    shrink (TableType t1 t2) = [t1, t2]
+    shrink (UnionType t1 t2) = [t1, t2]
+    shrink (FunctionType t1 t2) = [t1, t2]
+    shrink _ = []

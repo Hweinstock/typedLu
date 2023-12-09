@@ -1,0 +1,4 @@
+doTwiceError = function (f : int -> boolean, x : int) : int 
+    return f(f(x))
+end 
+
