@@ -7,44 +7,67 @@ import Data.Map qualified as Map
 import LuParser qualified
 import LuSyntax
 import LuTypes
-import Context (Context)
+import Context (Context, Environment, Reference (LocalRef, GlobalRef, TableRef))
 import Context qualified as C
 import State (State)
 import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 
+type Store = Map Name Table
+
+type Table = Map Value Value
+
 data EvalEnv = EvalEnv { 
   context :: Context Value,
   tableMap :: Map Name Table
 } deriving Show
 
--- type Reference = (Name, Value)
-data Reference = 
-    GlobalRef Name -- name of global
-  | LocalRef Name  -- name of local
-  | TableRef Name Value  -- name of table, value that keys it. 
-  deriving (Eq, Show)
+instance Environment EvalEnv Value where 
+  index :: Reference -> State EvalEnv Value
+  index (GlobalRef n) = do 
+    env <- S.get 
+    return $ case C.getGlobal (context env) n of 
+      Just v -> v 
+      _ -> NilVal
+  index (LocalRef n) = do 
+    env <- S.get 
+    return $ case C.getLocal (context env) n of 
+      Just v -> v 
+      _ -> NilVal 
+  index (TableRef tname tkey) = do 
+    env <- S.get 
+    return $ case Map.lookup tname (tableMap env) of 
+      Just table -> case Map.lookup tkey table of 
+        Just v -> v 
+        _ -> NilVal 
+      _ -> NilVal
+    
+  update :: Reference -> Value -> State EvalEnv ()
+  update (GlobalRef n) v = S.modify (\env -> env {context = C.addGlobal (n, v) (context env)}) 
+  update (LocalRef n) v = S.modify (\env -> env {context = C.addLocal (n, v) (context env)}) 
+  update (TableRef tname tkey) v = do 
+    mTable <- tableFromState tname
+    S.modify (updateTable mTable) where 
+    updateTable :: Maybe Table -> EvalEnv -> EvalEnv 
+    updateTable mt env = case mt of 
+      Nothing -> env 
+      Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
 
-initialEnv :: EvalEnv
-initialEnv = fromStore $ Map.singleton globalTableName Map.empty
-
-extendedEnv :: EvalEnv
-extendedEnv = fromStore m where 
-  m = Map.fromList
-    [ ( globalTableName,
-        Map.fromList
-          [ (StringVal "x", IntVal 3),
-            (StringVal "t", TableVal "_t1")
-          ]
-      ),
-      ( "_t1",
-        Map.fromList
-          [ (StringVal "y", BoolVal True),
-            (IntVal 2, TableVal "_t1")
-          ]
-      )
-    ]
+resolveVar :: Var -> State EvalEnv (Maybe Reference)
+resolveVar (Name n) = return $ Just $ GlobalRef n
+resolveVar (Dot exp n) = do
+  e <- evalE exp
+  return $ case e of
+    TableVal tname -> Just (TableRef tname (StringVal n))
+    _ -> Nothing
+resolveVar (Proj exp1 exp2) = do
+  e1 <- evalE exp1
+  e2 <- evalE exp2
+  return $ case (e1, e2) of
+    (_, NilVal) -> Nothing
+    (TableVal t1, v) -> Just (TableRef t1 v)
+    _ -> Nothing
 
 toStore :: EvalEnv -> Store
 toStore env = Map.insert globalTableName (C.gMap (context env)) (tableMap env)
@@ -58,19 +81,11 @@ fromStore s = case Map.lookup globalTableName s of
         where 
           newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
 
-
 instance PP EvalEnv where 
   pp env = undefined 
 
 emptyEvalEnv :: EvalEnv 
 emptyEvalEnv = EvalEnv {context = C.emptyContext, tableMap = Map.empty}
-
-type Store = Map Name Table
-
-type Table = Map Value Value
-
-localTableName :: Name 
-localTableName = "_L"
 
 globalTableName :: Name
 globalTableName = "_G"
@@ -89,22 +104,18 @@ errorCodeName = "@E"
 
 returnValueRef :: Reference
 returnValueRef = GlobalRef returnValueName
--- returnValueRef = (globalTableName, StringVal returnValueName)
 
 returnFlagRef :: Reference
 returnFlagRef = GlobalRef returnFlagName
---returnFlagRef = (globalTableName, StringVal returnFlagName)
 
 haltFlagRef :: Reference 
 haltFlagRef = GlobalRef haltFlagName
--- haltFlagRef = (globalTableName, StringVal haltFlagName)
 
 errorCodeRef :: Reference 
-errorCodeRef = GlobalRef errorCodeName 
--- errorCodeRef = (globalTableName, StringVal errorCodeName)
+errorCodeRef = GlobalRef errorCodeName
 
 throwError :: ErrorCode -> State EvalEnv () 
-throwError ec = update errorCodeRef (ErrorVal ec) >> update haltFlagRef (BoolVal True) 
+throwError ec = C.update errorCodeRef (ErrorVal ec) >> C.update haltFlagRef (BoolVal True) 
 
 didReturnOrHalt :: State EvalEnv Bool 
 didReturnOrHalt = do 
@@ -135,13 +146,6 @@ isReturnFlagSet = isFlagSet returnFlagName
 isHaltFlagSet :: State EvalEnv Bool 
 isHaltFlagSet = isFlagSet haltFlagName
 
-xref :: Reference
-xref = GlobalRef "x"
---xref = ("_G", StringVal "x")
-
-yref :: Reference
-yref = TableRef "_t1" (StringVal "y")
-
 tableFromState :: Name -> State EvalEnv (Maybe Table)
 tableFromState tname | tname == globalTableName = Just . C.gMap . context <$> S.get
 tableFromState tname = Map.lookup tname . tableMap <$> S.get
@@ -165,38 +169,6 @@ index (TableRef tname tkey) = do
       _ -> NilVal 
     _ -> NilVal
 
--- index (tableName, NilVal) = return NilVal
--- index (tableName, key) = do
---   mTable <- tableFromState tableName
---   case mTable of
---     Just table -> case Map.lookup key table of
---       Just val -> return val
---       _ -> return NilVal
---     _ -> return NilVal
-
-update :: Reference -> Value -> State EvalEnv ()
-update (GlobalRef n) v = S.modify (\env -> env {context = C.addGlobal (n, v) (context env)}) 
-update (LocalRef n) v = S.modify (\env -> env {context = C.addLocal (n, v) (context env)}) 
-update (TableRef tname tkey) v = do 
-  mTable <- tableFromState tname
-  S.modify (updateTable mTable) where 
-  updateTable :: Maybe Table -> EvalEnv -> EvalEnv 
-  updateTable mt env = case mt of 
-    Nothing -> env 
-    Just t -> env {tableMap = (Map.insert tname (Map.insert tkey v t) (tableMap env))}
-
-
--- update (tableName, NilVal) newVal = S.get >>= \s -> return ()
--- update (tableName, key) newVal = do
---   t <- tableFromState tableName
---   S.modify (updateEnv t)
---   where
---     updateEnv :: Maybe Table -> EvalEnv -> EvalEnv 
---     updateEnv maybeTable env = 
---       case maybeTable of 
---         Nothing -> env
---         Just t -> fromStore (Map.insert tableName (Map.insert key newVal t) (toStore env))
-
 allocateTable :: [(Value, Value)] -> State EvalEnv Value
 allocateTable assocs = do
   env <- S.get
@@ -213,31 +185,6 @@ allocateTable assocs = do
 -- Keep nil out of the table
 nonNil :: (Value, Value) -> Bool
 nonNil (k, v) = k /= NilVal && v /= NilVal
-
--- | Convert a variable into a reference into the store.
--- Fails when the var is `t.x` or t[1] and `t` is not defined in the store
--- when the var is `2.y` or `nil[2]` (i.e. not a `TableVal`)
--- or when the var is t[nil]
-resolveVar :: Var -> State EvalEnv (Maybe Reference)
-resolveVar (Name n) = return $ Just $ GlobalRef n
-  
-  -- do
-  -- mGlobalTable <- tableFromState globalTableName
-  -- return $ case mGlobalTable of
-  --   Just globalTable -> Just (globalTableName, StringVal n)
-  --   _ -> Nothing
-resolveVar (Dot exp n) = do
-  e <- evalE exp
-  return $ case e of
-    TableVal tname -> Just (TableRef tname (StringVal n))
-    _ -> Nothing
-resolveVar (Proj exp1 exp2) = do
-  e1 <- evalE exp1
-  e2 <- evalE exp2
-  return $ case (e1, e2) of
-    (_, NilVal) -> Nothing
-    (TableVal t1, v) -> Just (TableRef t1 v)
-    _ -> Nothing
 
 -- | Expression evaluator
 evalE :: Expression -> State EvalEnv Value
@@ -272,8 +219,8 @@ evalE e = do
           eval b
           returnValue <- evalE (Var (Name returnValueName))
           -- Reset Flags/ReturnValue
-          update returnValueRef NilVal 
-          update returnFlagRef (BoolVal False)
+          C.update returnValueRef NilVal 
+          C.update returnFlagRef (BoolVal False)
 
           -- Unscope Parameters i.e. NilValue them. 
           setVars parameterNames (map Val pOrigValues)
@@ -387,7 +334,7 @@ evalS s = continueWithFlags () (doEvalS s) where
     mRef <- resolveVar v
     e' <- evalE e
     case mRef of
-      Just ref -> update ref e'
+      Just ref -> C.update ref e'
       _ -> return ()
   doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
   doEvalS (Return e) = evalS (Assign (Name returnValueName, UnknownType) e) >> evalS (Assign (Name returnFlagName, BooleanType) (Val (BoolVal True)))

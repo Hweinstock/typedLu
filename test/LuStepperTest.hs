@@ -2,7 +2,8 @@ module LuStepperTest where
 
 import LuSyntax
 import LuStepper
-import LuEvaluator (EvalEnv, initialEnv, extendedEnv, globalTableName, exec, toStore, Store, emptyEvalEnv, fromStore)
+import LuEvaluator (EvalEnv, globalTableName, exec, toStore, Store, emptyEvalEnv, fromStore)
+import LuEvaluatorTest (initialEnv, extendedEnv)
 import State (State)
 import State qualified as S
 import Data.Map (Map, (!?))

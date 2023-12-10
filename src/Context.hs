@@ -10,17 +10,31 @@ import State (State)
 import qualified State as S
 
 
+
 data Context a = Context {
     gMap :: Map Value a, 
     localStack :: Stack (LocalVar a),  
     curDepth :: Int
 }
 
+data Reference = 
+    GlobalRef Name -- name of global
+  | LocalRef Name  -- name of local
+  | TableRef Name Value  -- name of table, value that keys it. 
+  deriving (Eq, Show)
+
 data LocalVar a = LocalVar {
     val :: a,
     name :: Name,
     depth :: Int
 }
+
+
+
+class Environment a v where 
+    index :: Reference -> State a v 
+    update :: Reference -> v -> State a ()
+
 
 addGlobal :: (Name, a) -> Context a -> Context a
 addGlobal (k, v) c = c {gMap = Map.insert (StringVal k) v (gMap c)}
