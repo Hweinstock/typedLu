@@ -66,14 +66,16 @@ CP2:
 - [x] Implement `checker`. 
 - [x] Implement `synthesis`.
 - [x] Implement `typeCheckBlock` and `typeCheckStatement`.
-- [ ] Generalize store used in evaluator to use `Environment`. (Harry)
+- [x] Generalize store used in evaluator to use `Environment`. (Harry)
 - [ ] Tweak parser (and typechecker) to allow functions called straight from tables. (Harry)
 - [ ] Build some nice demo/ui to show that it works. 
 
 Potential Extensions:
-- [ ] Be able to check types within stepper. 
-- [ ] Proper lexical scoping for function calls. 
+- [ ] Implement Local variables. 
+- [ ] Lexical Scoping for functions. 
+- [ ] Be able to check types within stepper.  
 - [ ] User Defined types.
+- [ ] Type assertions / coercions
 - [ ] Allow optional types in tables and functions. 
 - [ ] Other things?
 
