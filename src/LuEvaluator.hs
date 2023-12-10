@@ -147,25 +147,6 @@ tableFromState :: Name -> State EvalEnv (Maybe Table)
 tableFromState tname | tname == globalTableName = Just . C.gMap . context <$> S.get
 tableFromState tname = Map.lookup tname . tableMap <$> S.get
 
--- index :: Reference -> State EvalEnv Value
--- index (GlobalRef n) = do 
---   env <- S.get 
---   return $ case C.getGlobal n env of 
---     Just v -> v 
---     _ -> NilVal
--- index (LocalRef n) = do 
---   env <- S.get 
---   return $ case C.getLocal n env of 
---     Just v -> v 
---     _ -> NilVal 
--- index (TableRef tname tkey) = do 
---   env <- S.get 
---   return $ case Map.lookup tname (tableMap env) of 
---     Just table -> case Map.lookup tkey table of 
---       Just v -> v 
---       _ -> NilVal 
---     _ -> NilVal
-
 allocateTable :: [(Value, Value)] -> State EvalEnv Value
 allocateTable assocs = do
   env <- S.get

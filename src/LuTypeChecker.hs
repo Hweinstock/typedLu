@@ -167,8 +167,8 @@ isPolymorphicBop _ = False
 typeCheckAST :: Block -> Either String () 
 typeCheckAST b = S.evalState (typeCheckBlock b) emptyTypeEnv
 
-runForContext :: Block -> Either String TypeEnv 
-runForContext b = case S.runState (typeCheckBlock b) emptyTypeEnv of 
+runForEnv :: Block -> Either String TypeEnv 
+runForEnv b = case S.runState (typeCheckBlock b) emptyTypeEnv of 
     (Right (), finalStore) -> Right finalStore
     (Left l, finalStore) -> Left l
     

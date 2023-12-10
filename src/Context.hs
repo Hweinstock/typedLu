@@ -9,8 +9,6 @@ import LuSyntax
 import State (State)
 import qualified State as S
 
-
-
 data Context a = Context {
     gMap :: Map Value a, 
     localStack :: Stack (LocalVar a),  

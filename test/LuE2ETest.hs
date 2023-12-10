@@ -2,9 +2,9 @@ module LuE2ETest where
 
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
-import LuEvaluator (Store, eval, globalTableName, EvalEnv, toStore)
+import LuEvaluator (Store, eval, globalTableName, EvalEnv, toStore, errorCodeName, haltFlagName)
 import LuEvaluatorTest (initialEnv)
-import LuTypeChecker (typeCheckAST, runForContext, getUncalledFunc, TypeEnv, contextLookup)
+import LuTypeChecker (typeCheckAST, runForEnv, getUncalledFunc, TypeEnv, contextLookup)
 import Context (Context) 
 import Context qualified as C
 import LuSyntax
@@ -32,7 +32,7 @@ typeCheckFileForStore fp = do
         (Left _) -> do 
             return $ Left "Failed to parse file"
         (Right ast) -> do 
-            return $ case runForContext ast of 
+            return $ case runForEnv ast of 
                 Right s -> Right s
                 Left m -> Left m 
 
@@ -93,7 +93,7 @@ getTypeEnvFile fp = do
     parseResult <- parseLuFile fp 
     case parseResult of 
         (Left l) -> return $ Left l
-        Right ast -> case runForContext ast of 
+        Right ast -> case runForEnv ast of 
             (Left l2) -> return $ Left l2
             Right store -> return $ Right store
 
@@ -224,8 +224,8 @@ test_error =
     "e2e error" ~: 
         TestList 
             [ 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), ("@H", BoolVal True), ("@E", ErrorVal IllegalArguments)]), 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), ("@H", BoolVal True), ("@E", ErrorVal DivideByZero)]) 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), (haltFlagName, BoolVal True), (errorCodeName, ErrorVal IllegalArguments)]), 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), (haltFlagName, BoolVal True), (errorCodeName, ErrorVal DivideByZero)]) 
             ]
 test :: IO Counts 
 test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]
