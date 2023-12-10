@@ -82,9 +82,11 @@ resolveVar (Proj exp1 exp2) = do
     (TableVal t1, v) -> Just (TableRef t1 v)
     _ -> Nothing
 
+-- | Helper function to convert evaluation environment to Store (for testing and debugging)
 toStore :: EvalEnv -> Store
 toStore env = Map.insert globalTableName (C.gMap (context env)) (tableMap env)
 
+-- | Helper function to convert Store to evaluation environment (for testing and debugging)
 fromStore :: Store -> EvalEnv 
 fromStore s = case Map.lookup globalTableName s of 
   Nothing -> C.emptyContext -- Shouldn't hit this cae.  
@@ -261,11 +263,6 @@ getTableSize v = do
   return $ case Map.lookup v (tableMap s) of 
     Just t -> Just $ length t
     _ -> Nothing
-
-
-  -- S.get >>= \s -> return $ do
-  --   targetTable <- Map.lookup v (toStore s)
-  --   return $ length targetTable
 
 evalOp1 :: Uop -> Value -> State EvalEnv Value
 evalOp1 Neg (IntVal v) = return $ IntVal $ negate v
