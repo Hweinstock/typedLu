@@ -76,6 +76,13 @@ class Environment a v where
         Just lv -> Just $ val lv 
         _ -> Nothing
 
+    prepareFunctionEnv :: [(Name, v)] -> State a ()
+    prepareFunctionEnv params = do 
+        let getThisContext = getContext :: a -> Context v
+        S.modify (\env -> setContext env (enterScope (getThisContext env)))
+        S.modify (\e -> foldr addLocal e params)
+    
+
 -- | Decrease depth of scope and remove variables at this level. 
 exitScope :: Context a -> Context a
 exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 

@@ -142,7 +142,7 @@ test_function =
         TestList 
            [
              "function1" ~: testEvalFile "test/lu/function1.lu" (checkVarExistsInStore "foo"), 
-             "function2" ~: testEvalFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11), ("x1", NilVal), ("y1", NilVal)]), 
+             "function2" ~: testEvalFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11)]), 
              "function3" ~: testEvalFile "test/lu/function3.lu" (checkVarValuesInStore [("z", BoolVal False), ("s", StringVal "True"), ("x", IntVal 1), ("y", IntVal 2), ("result", IntVal (-1))]), 
              "function4" ~: testEvalFile "test/lu/function4.lu" (checkVarValueInStore "z" (IntVal 5)), 
              "function5" ~: testEvalFile "test/lu/function5.lu" (checkVarValuesInStore [("z", StringVal "foo"), ("x", IntVal 1)]), 

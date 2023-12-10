@@ -95,7 +95,7 @@ instance Synthable Value where
     synth (StringVal _) = return $ return StringType 
     synth (TableVal n) = undefined --what is this case? 
     synth (FunctionVal pms rt b) = do 
-        prepareFunctionEnv pms rt 
+        C.prepareFunctionEnv ((returnTypeName, rt) : pms)
         s <- S.get
         S.modify exitEnvScope
         case S.evalState (typeCheckBlock b) s of 
@@ -152,9 +152,6 @@ instance Synthable [TableField] where
                 (Left l, _, _) -> return $ Left l 
                 (_, Left l, _) -> return $ Left l
                 (_, _, Left l) -> return $ Left l
-
-prepareFunctionEnv :: [Parameter] -> LType -> State TypeEnv ()
-prepareFunctionEnv pms rt = S.modify enterEnvScope >> S.modify (\e -> foldr C.addLocal e ((returnTypeName, rt) : pms))
 
 isPolymorphicBop :: Bop -> Bool
 isPolymorphicBop Eq = True 
@@ -323,7 +320,7 @@ typeCheckFuncBody n = do
     let funcValue = getUncalledFunc s n  
     case funcValue of 
         Just (FunctionVal pms rt b) -> do 
-            prepareFunctionEnv pms rt 
+            C.prepareFunctionEnv ((returnTypeName, rt) : pms)
             S.modify (\env -> removeUncalledFunc env n)
             res <- typeCheckBlock b 
             S.modify exitEnvScope 

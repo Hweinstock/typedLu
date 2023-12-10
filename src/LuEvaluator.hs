@@ -51,8 +51,20 @@ instance Environment EvalEnv Value where
         Nothing -> env 
         Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
 
+enterEnvScope :: EvalEnv -> EvalEnv 
+enterEnvScope env = env {context = C.enterScope (context env)}
+
+exitEnvScope :: EvalEnv -> EvalEnv 
+exitEnvScope env = env {context = C.exitScope (context env)}
+
 resolveVar :: Var -> State EvalEnv (Maybe Reference)
-resolveVar (Name n) = return $ Just $ GlobalRef n
+resolveVar (Name n) = do 
+  env <- S.get
+  let localLookup = C.getLocal n env :: Maybe Value 
+  let globalLookup = C.getGlobal n env :: Maybe Value 
+  return $ case (localLookup, globalLookup) of 
+        (Just v, _) -> Just $ LocalRef n
+        _ -> Just $ GlobalRef n
 resolveVar (Dot exp n) = do
   e <- evalE exp
   return $ case e of
@@ -188,22 +200,19 @@ evalE e = do
       fv <- evalE (Var func) 
       case fv of 
         (FunctionVal ps rt b) -> do 
-          let parameterNames = map fst ps
-          let pOrigValuesVars = map (Var . Name) parameterNames
-          pOrigValues <- seqEval pOrigValuesVars
-
-          -- Initialize parameters as values. 
-          setVars parameterNames pps 
-          eval b
-          returnValue <- evalE (Var (Name returnValueName))
-          -- Reset Flags/ReturnValue
-          C.update returnValueRef NilVal 
-          C.update returnFlagRef (BoolVal False)
-
-          -- Unscope Parameters i.e. NilValue them. 
-          setVars parameterNames (map Val pOrigValues)
+          parameters <- evalParameters (map fst ps) pps
+          let extParameters = (returnValueName, NilVal) : (returnFlagName, BoolVal False) : parameters
+          C.prepareFunctionEnv extParameters 
+          eval b 
+          returnValue <- evalE (Var (Name returnValueName)) 
+          S.modify exitEnvScope
           return returnValue
         _ -> return NilVal
+
+evalParameters :: [Name] -> [Expression] -> State EvalEnv [(Name, Value)]
+evalParameters pNames pExps = do 
+  pValues <- seqEval pExps 
+  return $ zip pNames pValues
 
 -- | Set list of parameters to list of expressions, return resulting state. 
 setVars :: [Name] -> [Expression] -> State EvalEnv () 
