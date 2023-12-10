@@ -162,10 +162,8 @@ tableFromState tname = Map.lookup tname . tableMap <$> S.get
 
 allocateTable :: [(Value, Value)] -> State EvalEnv Value
 allocateTable assocs = do
-  env <- S.get
-  let store = toStore env 
   -- make a fresh name for the new table
-  let n = length (Map.keys store)
+  n <- length . Map.keys . tableMap <$> S.get
   let tableName = "_t" ++ show n
   -- make sure we don't have a nil key or value
   let assocs' = Map.fromList (filter nonNil assocs)
@@ -257,17 +255,23 @@ evalTableConst xs = do
     helper :: [TableField] -> State EvalEnv [(Value, Value)]
     helper = foldr accuFieldToPair (return [])
 
-getTableSizeState :: String -> State EvalEnv (Maybe Int)
-getTableSizeState v =
-  S.get >>= \s -> return $ do
-    targetTable <- Map.lookup v (toStore s)
-    return $ length targetTable
+getTableSize :: String -> State EvalEnv (Maybe Int)
+getTableSize v = do 
+  s <- S.get 
+  return $ case Map.lookup v (tableMap s) of 
+    Just t -> Just $ length t
+    _ -> Nothing
+
+
+  -- S.get >>= \s -> return $ do
+  --   targetTable <- Map.lookup v (toStore s)
+  --   return $ length targetTable
 
 evalOp1 :: Uop -> Value -> State EvalEnv Value
 evalOp1 Neg (IntVal v) = return $ IntVal $ negate v
 evalOp1 Len (StringVal v) = return $ IntVal $ length v
 evalOp1 Len (TableVal v) = do
-  ml <- getTableSizeState v
+  ml <- getTableSize v
   return $ case ml of
     Just l -> IntVal l
     _ -> NilVal

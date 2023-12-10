@@ -19,13 +19,13 @@ extendedEnv = fromStore m where
     [ ( globalTableName,
         Map.fromList
           [ (StringVal "x", IntVal 3),
-            (StringVal "t", TableVal "_t1")
+            (StringVal "t", TableVal "_t0")
           ]
       ),
-      ( "_t1",
+      ( "_t0",
         Map.fromList
           [ (StringVal "y", BoolVal True),
-            (IntVal 2, TableVal "_t1")
+            (IntVal 2, TableVal "_t0")
           ]
       )
     ]
@@ -34,7 +34,7 @@ xref :: Reference
 xref = GlobalRef "x"
 
 yref :: Reference
-yref = TableRef "_t1" (StringVal "y")
+yref = TableRef "_t0" (StringVal "y")
 
 test_index :: Test
 test_index =
@@ -51,7 +51,7 @@ test_index =
         S.evalState (C.index (TableRef "z" NilVal)) extendedEnv ~?= NilVal,
         -- Updates using the `nil` key are ignored
         toStore (S.execState (C.update (TableRef "_t" NilVal) (IntVal 3)) extendedEnv) ~?= toStore extendedEnv,
-        S.evalState (C.index (GlobalRef "t")) extendedEnv ~?= TableVal "_t1"
+        S.evalState (C.index (GlobalRef "t")) extendedEnv ~?= TableVal "_t0"
       ]
 
 test_update :: Test
@@ -83,11 +83,11 @@ test_resolveVar =
         -- For Proj we also shouldn't project from Nil
         S.evalState (resolveVar (Proj (Var (Name "t")) (Val NilVal))) extendedEnv ~?= Nothing,
         -- If the table is defined, we should return a reference to it, even when the field is undefined
-        S.evalState (resolveVar (Dot (Var (Name "t")) "z")) extendedEnv ~?= Just (TableRef "_t1" (StringVal "z")),
-        S.evalState (resolveVar (Dot (Var (Name "t")) "y")) extendedEnv ~?= Just (TableRef "_t1" (StringVal "y")),
+        S.evalState (resolveVar (Dot (Var (Name "t")) "z")) extendedEnv ~?= Just (TableRef "_t0" (StringVal "z")),
+        S.evalState (resolveVar (Dot (Var (Name "t")) "y")) extendedEnv ~?= Just (TableRef "_t0" (StringVal "y")),
         S.evalState (resolveVar (Dot (Var (Name "t2")) "z")) extendedEnv ~?= Nothing,
         -- and how we refer to the field shouldn't matter
-        S.evalState (resolveVar (Proj (Var (Name "t")) (Val (StringVal "z")))) extendedEnv ~?= Just (TableRef "_t1" (StringVal "z")),
+        S.evalState (resolveVar (Proj (Var (Name "t")) (Val (StringVal "z")))) extendedEnv ~?= Just (TableRef "_t0" (StringVal "z")),
         S.evalState (resolveVar (Proj (Var (Name "t2")) (Val (StringVal "z")))) extendedEnv ~?= Nothing,
         S.evalState (resolveVar (Proj (Val NilVal) (Val (StringVal "z")))) extendedEnv ~?= Nothing
       ]
@@ -105,8 +105,8 @@ test_evaluateLen =
   "evaluate len" ~:
     TestList
       [ evaluate (Op1 Len (Val (StringVal "5520"))) extendedEnv ~?= IntVal 4,
-        evaluate (Op1 Len (Val (TableVal "_G"))) extendedEnv ~?= IntVal 2,
-        evaluate (Op1 Len (Val (TableVal "_t1"))) extendedEnv ~?= IntVal 2,
+        evaluate (Op1 Len (Val (TableVal "_G"))) extendedEnv ~?= NilVal,
+        evaluate (Op1 Len (Val (TableVal "_t0"))) extendedEnv ~?= IntVal 2,
         evaluate (Op1 Len (Val (TableVal "_t550"))) extendedEnv ~?= NilVal,
         evaluate (Op1 Len (Val (IntVal 5520))) extendedEnv ~?= IntVal 5520,
         evaluate (Op1 Len (Val (BoolVal True))) extendedEnv ~?= IntVal 1
@@ -121,35 +121,35 @@ test_tableConst =
           initialEnv)
           ~?= Map.fromList
                   [ ("_G", Map.empty),
-                    ("_t1", Map.fromList [(StringVal "x", IntVal 3)])
+                    ("_t0", Map.fromList [(StringVal "x", IntVal 3)])
                   ],
         toStore (S.execState
           (evalE (TableConst [FieldName "x" (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
           initialEnv)
           ~?= Map.fromList
                   [ ("_G", Map.empty),
-                    ("_t1", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
+                    ("_t0", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
                   ],
         toStore (S.execState
           (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3))]))
           initialEnv)
           ~?= Map.fromList
                   [ ("_G", Map.empty),
-                    ("_t1", Map.fromList [(StringVal "x", IntVal 3)])
+                    ("_t0", Map.fromList [(StringVal "x", IntVal 3)])
                   ],
         toStore (S.execState
           (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
           initialEnv)
           ~?= Map.fromList
                   [ ("_G", Map.empty),
-                    ("_t1", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
+                    ("_t0", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
                   ],
         toStore (S.execState
           (evalE (TableConst []))
           initialEnv)
           ~?= Map.fromList
                   [ ("_G", Map.empty),
-                    ("_t1", Map.empty)
+                    ("_t0", Map.empty)
                   ]
       ]
 
@@ -246,14 +246,14 @@ tExecTable =
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList
-              [ (StringVal "a", TableVal "_t1"),
+              [ (StringVal "a", TableVal "_t0"),
                 (StringVal "k", IntVal 20),
                 (StringVal "o1", IntVal 10),
                 (StringVal "o2", StringVal "great"),
                 (StringVal "o3", IntVal 11)
               ]
           ),
-          ("_t1", Map.fromList [(IntVal 20, StringVal "great"), (StringVal "x", IntVal 11)])
+          ("_t0", Map.fromList [(IntVal 20, StringVal "great"), (StringVal "x", IntVal 11)])
         ]
 
 tExecBfs :: Test

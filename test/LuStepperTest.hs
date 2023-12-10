@@ -59,14 +59,14 @@ tExecStepTable =
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList
-              [ (StringVal "a", TableVal "_t1"),
+              [ (StringVal "a", TableVal "_t0"),
                 (StringVal "k", IntVal 20),
                 (StringVal "o1", IntVal 10),
                 (StringVal "o2", StringVal "great"),
                 (StringVal "o3", IntVal 11)
               ]
           ),
-          ("_t1", Map.fromList [(IntVal 20, StringVal "great"), (StringVal "x", IntVal 11)])
+          ("_t0", Map.fromList [(IntVal 20, StringVal "great"), (StringVal "x", IntVal 11)])
         ]
 
 -- | bfs.lu: calculate breadth-first search of a graph represented by adjacency lists.
