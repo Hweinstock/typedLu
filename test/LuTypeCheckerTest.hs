@@ -4,26 +4,27 @@ import LuTypeChecker
 import LuSyntax
 import LuTypes
 import State qualified as S
+import Context qualified as C
 import Data.Map qualified as Map
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import LuEvaluator (Store)
 
 store :: TypeEnv
-store = setGMap emptyTypeEnv typeMap where 
+store = C.setGMap typeMap emptyTypeEnv where 
   typeMap = Map.fromList
-    [ ("int", IntType),
-      ("string", StringType),
-      ("boolean", BooleanType),
-      ("int-or-string", UnionType IntType StringType), 
-      ("table1", TableType StringType BooleanType),
-      ("table2", TableType StringType IntType),
-      ("table3", TableType BooleanType BooleanType),
-      ("function0", FunctionType Never StringType),
-      ("function1", FunctionType IntType StringType),
-      ("function2", FunctionType StringType StringType),
-      ("function3", FunctionType IntType IntType),
-      ("function4", FunctionType IntType (UnionType IntType StringType))
+    [ (StringVal "int", IntType),
+      (StringVal "string", StringType),
+      (StringVal "boolean", BooleanType),
+      (StringVal "int-or-string", UnionType IntType StringType), 
+      (StringVal "table1", TableType StringType BooleanType),
+      (StringVal "table2", TableType StringType IntType),
+      (StringVal "table3", TableType BooleanType BooleanType),
+      (StringVal "function0", FunctionType Never StringType),
+      (StringVal "function1", FunctionType IntType StringType),
+      (StringVal "function2", FunctionType StringType StringType),
+      (StringVal "function3", FunctionType IntType IntType),
+      (StringVal "function4", FunctionType IntType (UnionType IntType StringType))
     ]
 
 {-

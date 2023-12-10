@@ -24,15 +24,21 @@ data EvalEnv = EvalEnv {
 } deriving Show
 
 instance Environment EvalEnv Value where 
+  getContext :: EvalEnv -> Context Value 
+  getContext = context 
+
+  setContext :: EvalEnv -> Context Value -> EvalEnv 
+  setContext env c = env {context = c}
+
   index :: Reference -> State EvalEnv Value
   index (GlobalRef n) = do 
     env <- S.get 
-    return $ case C.getGlobal (context env) n of 
+    return $ case C.getGlobal n env of 
       Just v -> v 
       _ -> NilVal
   index (LocalRef n) = do 
     env <- S.get 
-    return $ case C.getLocal (context env) n of 
+    return $ case C.getLocal n env of 
       Just v -> v 
       _ -> NilVal 
   index (TableRef tname tkey) = do 
@@ -43,16 +49,14 @@ instance Environment EvalEnv Value where
         _ -> NilVal 
       _ -> NilVal
     
-  update :: Reference -> Value -> State EvalEnv ()
-  update (GlobalRef n) v = S.modify (\env -> env {context = C.addGlobal (n, v) (context env)}) 
-  update (LocalRef n) v = S.modify (\env -> env {context = C.addLocal (n, v) (context env)}) 
-  update (TableRef tname tkey) v = do 
+  updateTable :: Reference -> Value -> State EvalEnv ()
+  updateTable (TableRef tname tkey) v = do 
     mTable <- tableFromState tname
-    S.modify (updateTable mTable) where 
-    updateTable :: Maybe Table -> EvalEnv -> EvalEnv 
-    updateTable mt env = case mt of 
-      Nothing -> env 
-      Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
+    S.modify (updateTableHelper mTable) where 
+      updateTableHelper :: Maybe Table -> EvalEnv -> EvalEnv 
+      updateTableHelper mt env = case mt of 
+        Nothing -> env 
+        Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
 
 resolveVar :: Var -> State EvalEnv (Maybe Reference)
 resolveVar (Name n) = return $ Just $ GlobalRef n
@@ -77,7 +81,8 @@ fromStore s = case Map.lookup globalTableName s of
   Nothing -> emptyEvalEnv -- Shouldn't hit this cae.  
   Just globalTable -> newEnv where 
     newEnv = let initEnv = emptyEvalEnv in 
-      initEnv {context = C.setGMap (context initEnv) globalTable, tableMap = newTables} 
+      (C.setGMap globalTable initEnv) {tableMap = newTables}
+      -- initEnv {context = C.setGMap (context initEnv) globalTable, tableMap = newTables} 
         where 
           newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
 
@@ -153,12 +158,12 @@ tableFromState tname = Map.lookup tname . tableMap <$> S.get
 index :: Reference -> State EvalEnv Value
 index (GlobalRef n) = do 
   env <- S.get 
-  return $ case C.getGlobal (context env) n of 
+  return $ case C.getGlobal n env of 
     Just v -> v 
     _ -> NilVal
 index (LocalRef n) = do 
   env <- S.get 
-  return $ case C.getLocal (context env) n of 
+  return $ case C.getLocal n env of 
     Just v -> v 
     _ -> NilVal 
 index (TableRef tname tkey) = do 

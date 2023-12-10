@@ -4,10 +4,11 @@ import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
 import LuEvaluator (Store, eval, index, globalTableName, EvalEnv, toStore)
 import LuEvaluatorTest (initialEnv)
-import LuTypeChecker (typeCheckAST, runForContext, getUncalledFunc, TypeEnv, getFromEnv)
+import LuTypeChecker (typeCheckAST, runForContext, getUncalledFunc, TypeEnv, contextLookup)
 import Context (Context) 
 import Context qualified as C
 import LuSyntax
+import LuTypes
 import State qualified as S
 import Data.Map qualified as Map
 
@@ -203,8 +204,8 @@ test_typeCheckStore =
         TestList 
             [
                 "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (containsFunc "foo"), 
-                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (inTypeMap "z" False),
-                "calledFunc" ~: testTypeCheckFileStore "test/lu/calledFunc.lu" (inTypeMap "z" True)
+                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (isNilOrUndefined "z" False),
+                "calledFunc" ~: testTypeCheckFileStore "test/lu/calledFunc.lu" (isNilOrUndefined "z" True)
 
             ] where 
                 containsFunc :: Name -> TypeEnv -> Either String Bool 
@@ -212,9 +213,10 @@ test_typeCheckStore =
                     Just _ -> return True 
                     _ -> Left "Failed to find"
 
-                inTypeMap :: Name -> Bool -> TypeEnv -> Either String Bool 
-                inTypeMap n expected env = case getFromEnv env n of 
-                    Just _ -> return expected 
+                isNilOrUndefined :: Name -> Bool -> TypeEnv -> Either String Bool 
+                isNilOrUndefined n expected env = case S.evalState (contextLookup n) env of 
+                    NilType -> return expected 
+                    UnknownType -> return expected
                     _ -> return (not expected)
 
 test_error :: Test 

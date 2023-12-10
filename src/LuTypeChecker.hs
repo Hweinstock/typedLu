@@ -8,7 +8,7 @@ import Data.Map (Map)
 import Data.List (nub)
 import qualified Data.Map as Map
 import qualified Stack
-import Context (Context)
+import Context (Context, Reference (GlobalRef, LocalRef, TableRef), Environment)
 import qualified Context as C
 import LuTypes 
 
@@ -19,6 +19,38 @@ data TypeEnv = TypeEnv {
     uncalledFuncs :: Map Name Value, 
     context :: Context LType
 } deriving Show 
+
+instance Environment TypeEnv LType where 
+    getContext :: TypeEnv -> Context LType 
+    getContext = context 
+
+    setContext :: TypeEnv -> Context LType -> TypeEnv 
+    setContext env newContext = env {context = newContext}
+
+    index :: Reference -> State TypeEnv LType
+    index (GlobalRef n) = do 
+        env <- S.get 
+        return $ case C.getGlobal n env of 
+            Just v -> v 
+            _ -> NilType
+    index (LocalRef n) = do 
+        env <- S.get 
+        return $ case C.getLocal n env of 
+            Just v -> v 
+            _ -> UnknownType 
+    index (TableRef tname tkey) = return UnknownType
+
+    updateTable :: Reference -> LType -> State TypeEnv ()
+    updateTable (TableRef tname tkey) v = return ()
+
+contextLookup :: Name -> State TypeEnv LType 
+contextLookup n = do 
+    localResolve <- C.index (LocalRef n)
+    globalResolve <- C.index (GlobalRef n)
+    if localResolve == UnknownType then 
+        return globalResolve
+    else 
+        return localResolve
 
 emptyTypeEnv :: TypeEnv 
 emptyTypeEnv = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
@@ -37,25 +69,6 @@ enterEnvScope env = env {context = C.enterScope (context env)}
 
 exitEnvScope :: TypeEnv -> TypeEnv 
 exitEnvScope env = env {context = C.exitScope (context env)}
-
-contextLookup :: Name -> State TypeEnv (Maybe LType) 
-contextLookup n = do 
-    s <- S.get 
-    return $ case C.get (context s) n of 
-        Just l -> Just l 
-        _ -> Nothing
-
-getFromEnv :: TypeEnv -> Name -> Maybe LType 
-getFromEnv env = C.get (context env)
-
-addLocalToEnv :: (Name, LType) -> TypeEnv -> TypeEnv 
-addLocalToEnv keyValuePair env = env {context = C.addLocal keyValuePair (context env)}
-
-addGlobalToEnv :: (Name, LType) -> TypeEnv -> TypeEnv 
-addGlobalToEnv keyValuePair env = env {context = C.addGlobal keyValuePair (context env)}
-
-setGMap :: TypeEnv -> Map Name LType -> TypeEnv 
-setGMap env m = env {context = C.setGMap (context env) (Map.mapKeys StringVal m)}
 
 type TypecheckerState a = State TypeEnv (Either String a)
 
@@ -101,11 +114,7 @@ synthFunc [(_, t)] rt = FunctionType t rt
 synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
 
 instance Synthable Var where 
-    synth (Name n) = do 
-        mT <- contextLookup n 
-        case mT of 
-            Just t -> return $ Right t
-            _ -> return $ Right NilType
+    synth (Name n) = Right <$> contextLookup n
     synth (Dot exp n) = do 
         eExpType <- synthesis exp 
         return $ case eExpType of 
@@ -150,7 +159,7 @@ instance Synthable [TableField] where
                 (_, _, Left l) -> return $ Left l
 
 prepareFunctionEnv :: [Parameter] -> LType -> State TypeEnv ()
-prepareFunctionEnv pms rt = S.modify enterEnvScope >> S.modify (\e -> foldr addLocalToEnv e ((returnTypeName, rt) : pms))
+prepareFunctionEnv pms rt = S.modify enterEnvScope >> S.modify (\e -> foldr C.addLocal e ((returnTypeName, rt) : pms))
 
 isPolymorphicBop :: Bop -> Bool
 isPolymorphicBop Eq = True 
@@ -271,7 +280,7 @@ typecheckTableAccess _ _ _= Left "Unable to access value from non-table"
 updateEnv :: Name -> LType -> Expression -> TypecheckerState ()
 updateEnv n t exp = do 
     env <- S.get 
-    S.modify (addGlobalToEnv (n, t))
+    S.modify (C.addGlobal (n, t))
     case (t, exp) of 
         (FunctionType _ _, Val f) -> do 
             S.modify (addUncalledFunc (n, f))

@@ -29,38 +29,39 @@ data LocalVar a = LocalVar {
     depth :: Int
 }
 
-
-
 class Environment a v where 
+    getContext :: a -> Context v 
+    setContext :: a -> Context v -> a 
+
     index :: Reference -> State a v 
+
     update :: Reference -> v -> State a ()
+    update (GlobalRef n) v = S.modify (addGlobal (n, v)) 
+    update (LocalRef n) v = S.modify (addLocal (n, v))
+    update t v = updateTable t v 
 
+    updateTable :: Reference -> v -> State a () 
 
-addGlobal :: (Name, a) -> Context a -> Context a
-addGlobal (k, v) c = c {gMap = Map.insert (StringVal k) v (gMap c)}
+    addLocal :: (Name, v) -> a -> a 
+    addLocal (n, v) env = let c = getContext env in
+                          let lv = LocalVar {val = v, name = n, depth = curDepth c} in 
+        setContext env (c {localStack = Stack.push (localStack c) lv}) 
+    
+    addGlobal :: (Name, v) -> a -> a 
+    addGlobal (k, v) env = let c = getContext env in
+        setContext env (c {gMap = Map.insert (StringVal k) v (gMap c)})
 
-addLocal :: (Name, a) -> Context a -> Context a 
-addLocal (k, v) c = c {localStack = Stack.push (localStack c) lv} where 
-    lv = LocalVar {val = v, name = k, depth = curDepth c}
+    setGMap :: Map Value v -> a -> a 
+    setGMap m env = let c = getContext env in 
+        setContext env (c {gMap = m})
 
-getGlobal :: Context a -> Name -> Maybe a 
-getGlobal c n = Map.lookup (StringVal n) (gMap c)
+    getGlobal :: Name -> a -> Maybe v 
+    getGlobal n env = Map.lookup (StringVal n) ((gMap . getContext) env)
 
-getLocal :: Context a -> Name -> Maybe a 
-getLocal c n = case Stack.peekUntil (localStack c) (\lv -> name lv == n) of 
-    Just lv -> Just $ val lv 
-    _ -> Nothing
-
-getLocalByIndex :: Context a -> Int -> Maybe a 
-getLocalByIndex c n = case Stack.peekN (localStack c) n of 
-    Just lv -> Just $ val lv 
-    _ -> Nothing
-
-get :: Context a -> Name -> Maybe a 
-get c n = case (getGlobal c n, getLocal c n) of 
-    (_, Just t) -> Just t
-    (Just t, _) -> Just t 
-    _ -> Nothing
+    getLocal :: Name -> a -> Maybe v 
+    getLocal n env = case Stack.peekUntil ((localStack . getContext) env) (\lv -> name lv == n) of 
+        Just lv -> Just $ val lv 
+        _ -> Nothing
 
 -- | Decrease depth of scope and remove variables at this level. 
 exitScope :: Context a -> Context a
@@ -72,8 +73,8 @@ exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDept
 enterScope :: Context a -> Context a
 enterScope c = c {curDepth = curDepth c + 1}
 
-setGMap :: Context a -> Map Value a -> Context a
-setGMap c m = c {gMap = m}
+-- setGMap :: Context a -> Map Value a -> Context a
+-- setGMap c m = c {gMap = m}
 
 emptyContext :: Context a 
 emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
