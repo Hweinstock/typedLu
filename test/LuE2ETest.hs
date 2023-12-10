@@ -221,8 +221,8 @@ test_error =
     "e2e error" ~: 
         TestList 
             [ 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal IllegalArguments)]), 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal DivideByZero)]) 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), ("@H", BoolVal True), ("@E", ErrorVal IllegalArguments)]), 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), ("@H", BoolVal True), ("@E", ErrorVal DivideByZero)]) 
             ]
 test :: IO Counts 
 test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]

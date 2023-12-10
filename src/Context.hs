@@ -11,7 +11,7 @@ import qualified State as S
 
 
 data Context a = Context {
-    gMap :: Map Name a, 
+    gMap :: Map Value a, 
     localStack :: Stack (LocalVar a),  
     curDepth :: Int
 }
@@ -23,17 +23,22 @@ data LocalVar a = LocalVar {
 }
 
 addGlobal :: (Name, a) -> Context a -> Context a
-addGlobal (k, v) c = c {gMap = Map.insert k v (gMap c)}
+addGlobal (k, v) c = c {gMap = Map.insert (StringVal k) v (gMap c)}
 
 addLocal :: (Name, a) -> Context a -> Context a 
 addLocal (k, v) c = c {localStack = Stack.push (localStack c) lv} where 
     lv = LocalVar {val = v, name = k, depth = curDepth c}
 
 getGlobal :: Context a -> Name -> Maybe a 
-getGlobal c n = Map.lookup n (gMap c)
+getGlobal c n = Map.lookup (StringVal n) (gMap c)
 
 getLocal :: Context a -> Name -> Maybe a 
 getLocal c n = case Stack.peekUntil (localStack c) (\lv -> name lv == n) of 
+    Just lv -> Just $ val lv 
+    _ -> Nothing
+
+getLocalByIndex :: Context a -> Int -> Maybe a 
+getLocalByIndex c n = case Stack.peekN (localStack c) n of 
     Just lv -> Just $ val lv 
     _ -> Nothing
 
@@ -53,7 +58,7 @@ exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDept
 enterScope :: Context a -> Context a
 enterScope c = c {curDepth = curDepth c + 1}
 
-setGMap :: Context a -> Map Name a -> Context a
+setGMap :: Context a -> Map Value a -> Context a
 setGMap c m = c {gMap = m}
 
 emptyContext :: Context a 

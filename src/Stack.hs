@@ -30,10 +30,17 @@ popUntil stk@(Stack s (x : xs)) f = if f x
 
 -- | Search stack for item by peeking until predicate is true. 
 peekUntil :: Stack a -> (a -> Bool) -> Maybe a 
-peekUntil stk@(Stack _ []) f = Nothing 
+peekUntil (Stack _ []) f = Nothing 
 peekUntil (Stack s (x : xs)) f = if f x 
     then Just x 
     else peekUntil (Stack (s-1) xs) f
+
+-- | Peek with offset N. peekN of 0 is same as peek. 
+peekN :: Stack a -> Int -> Maybe a 
+peekN (Stack _ []) _ = Nothing 
+peekN (Stack _ (x : xs)) 0 = Just x 
+peekN (Stack s (x : xs)) i = peekN (Stack (s-1) xs) (i-1)
+
 
 stackSize :: Stack a -> Int
 stackSize (Stack s _) = s

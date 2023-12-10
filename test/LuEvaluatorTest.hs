@@ -20,10 +20,10 @@ test_index =
         S.evalState (index yref) initialEnv ~?= NilVal,
         -- We should also be able to access "t[1]" in the extended store
         S.evalState (index yref) extendedEnv ~?= BoolVal True,
-        S.evalState (index ("z", NilVal)) extendedEnv ~?= NilVal,
+        S.evalState (index (TableRef "z" NilVal)) extendedEnv ~?= NilVal,
         -- Updates using the `nil` key are ignored
-        toStore (S.execState (update ("_t1", NilVal) (IntVal 3)) extendedEnv) ~?= toStore (extendedEnv),
-        S.evalState (index (globalTableName, StringVal "t")) extendedEnv ~?= TableVal "_t1"
+        toStore (S.execState (update (TableRef "_t" NilVal) (IntVal 3)) extendedEnv) ~?= toStore extendedEnv,
+        S.evalState (index (GlobalRef "t")) extendedEnv ~?= TableVal "_t1"
       ]
 
 test_update :: Test
@@ -45,8 +45,8 @@ test_resolveVar =
   "resolveVar" ~:
     TestList
       [ -- we should be able to resolve global variable `x` in the initial store, even though it is not defined
-        S.evalState (resolveVar (Name "x")) initialEnv ~?= Just ("_G", StringVal "x"),
-        S.evalState (resolveVar (Name "x")) extendedEnv ~?= Just ("_G", StringVal "x"),
+        S.evalState (resolveVar (Name "x")) initialEnv ~?= Just (GlobalRef "x") ,
+        S.evalState (resolveVar (Name "x")) extendedEnv ~?= Just (GlobalRef "x"),
         -- But in the case of Dot or Proj, the first argument should evaluate to a
         -- TableVal that is defined in the store. If it does not, then resolveVar
         -- should return Nothing.
@@ -55,11 +55,11 @@ test_resolveVar =
         -- For Proj we also shouldn't project from Nil
         S.evalState (resolveVar (Proj (Var (Name "t")) (Val NilVal))) extendedEnv ~?= Nothing,
         -- If the table is defined, we should return a reference to it, even when the field is undefined
-        S.evalState (resolveVar (Dot (Var (Name "t")) "z")) extendedEnv ~?= Just ("_t1", StringVal "z"),
-        S.evalState (resolveVar (Dot (Var (Name "t")) "y")) extendedEnv ~?= Just ("_t1", StringVal "y"),
+        S.evalState (resolveVar (Dot (Var (Name "t")) "z")) extendedEnv ~?= Just (TableRef "_t1" (StringVal "z")),
+        S.evalState (resolveVar (Dot (Var (Name "t")) "y")) extendedEnv ~?= Just (TableRef "_t1" (StringVal "y")),
         S.evalState (resolveVar (Dot (Var (Name "t2")) "z")) extendedEnv ~?= Nothing,
         -- and how we refer to the field shouldn't matter
-        S.evalState (resolveVar (Proj (Var (Name "t")) (Val (StringVal "z")))) extendedEnv ~?= Just ("_t1", StringVal "z"),
+        S.evalState (resolveVar (Proj (Var (Name "t")) (Val (StringVal "z")))) extendedEnv ~?= Just (TableRef "_t1" (StringVal "z")),
         S.evalState (resolveVar (Proj (Var (Name "t2")) (Val (StringVal "z")))) extendedEnv ~?= Nothing,
         S.evalState (resolveVar (Proj (Val NilVal) (Val (StringVal "z")))) extendedEnv ~?= Nothing
       ]

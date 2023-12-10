@@ -55,7 +55,7 @@ addGlobalToEnv :: (Name, LType) -> TypeEnv -> TypeEnv
 addGlobalToEnv keyValuePair env = env {context = C.addGlobal keyValuePair (context env)}
 
 setGMap :: TypeEnv -> Map Name LType -> TypeEnv 
-setGMap env m = env {context = C.setGMap (context env) m}
+setGMap env m = env {context = C.setGMap (context env) (Map.mapKeys StringVal m)}
 
 type TypecheckerState a = State TypeEnv (Either String a)
 

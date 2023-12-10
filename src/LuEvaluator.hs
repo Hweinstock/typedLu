@@ -16,41 +16,61 @@ import Test.QuickCheck qualified as QC
 
 data EvalEnv = EvalEnv { 
   context :: Context Value,
-  tables :: Map Name Table
+  tableMap :: Map Name Table
 } deriving Show
 
+-- type Reference = (Name, Value)
+data Reference = 
+    GlobalRef Name -- name of global
+  | LocalRef Name  -- name of local
+  | TableRef Name Value  -- name of table, value that keys it. 
+  deriving (Eq, Show)
+
+initialEnv :: EvalEnv
+initialEnv = fromStore $ Map.singleton globalTableName Map.empty
+
+extendedEnv :: EvalEnv
+extendedEnv = fromStore m where 
+  m = Map.fromList
+    [ ( globalTableName,
+        Map.fromList
+          [ (StringVal "x", IntVal 3),
+            (StringVal "t", TableVal "_t1")
+          ]
+      ),
+      ( "_t1",
+        Map.fromList
+          [ (StringVal "y", BoolVal True),
+            (IntVal 2, TableVal "_t1")
+          ]
+      )
+    ]
+
 toStore :: EvalEnv -> Store
-toStore env = Map.insert globalTableName gTable (tables env) where 
-  gTable = Map.mapKeys StringVal (C.gMap (context env))
+toStore env = Map.insert globalTableName (C.gMap (context env)) (tableMap env)
 
 fromStore :: Store -> EvalEnv 
 fromStore s = case Map.lookup globalTableName s of 
   Nothing -> emptyEvalEnv -- Shouldn't hit this cae.  
   Just globalTable -> newEnv where 
     newEnv = let initEnv = emptyEvalEnv in 
-      initEnv {context = C.setGMap (context initEnv) newGlobalTable, tables = newTables} 
+      initEnv {context = C.setGMap (context initEnv) globalTable, tableMap = newTables} 
         where 
           newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
-          newGlobalTable = Map.filterWithKey (\k _ -> k /= "@") (Map.mapKeys keyFunc globalTable)
-          where 
-            keyFunc (StringVal s) = s 
-            keyFunc _ = "@"
 
 
 instance PP EvalEnv where 
   pp env = undefined 
 
-instance QC.Arbitrary EvalEnv where 
-  arbitrary = undefined 
-  shrink = undefined
-
 emptyEvalEnv :: EvalEnv 
-emptyEvalEnv = EvalEnv {context = C.emptyContext, tables = Map.empty}
-
+emptyEvalEnv = EvalEnv {context = C.emptyContext, tableMap = Map.empty}
 
 type Store = Map Name Table
 
 type Table = Map Value Value
+
+localTableName :: Name 
+localTableName = "_L"
 
 globalTableName :: Name
 globalTableName = "_G"
@@ -62,22 +82,26 @@ returnFlagName :: Name
 returnFlagName = "@F"
 
 haltFlagName :: Name 
-haltFlagName = "_H"
+haltFlagName = "@H"
 
 errorCodeName :: Name 
-errorCodeName = "_E"
+errorCodeName = "@E"
 
 returnValueRef :: Reference
-returnValueRef = (globalTableName, StringVal returnValueName)
+returnValueRef = GlobalRef returnValueName
+-- returnValueRef = (globalTableName, StringVal returnValueName)
 
 returnFlagRef :: Reference
-returnFlagRef = (globalTableName, StringVal returnFlagName)
+returnFlagRef = GlobalRef returnFlagName
+--returnFlagRef = (globalTableName, StringVal returnFlagName)
 
 haltFlagRef :: Reference 
-haltFlagRef = (globalTableName, StringVal haltFlagName)
+haltFlagRef = GlobalRef haltFlagName
+-- haltFlagRef = (globalTableName, StringVal haltFlagName)
 
 errorCodeRef :: Reference 
-errorCodeRef = (globalTableName, StringVal errorCodeName)
+errorCodeRef = GlobalRef errorCodeName 
+-- errorCodeRef = (globalTableName, StringVal errorCodeName)
 
 throwError :: ErrorCode -> State EvalEnv () 
 throwError ec = update errorCodeRef (ErrorVal ec) >> update haltFlagRef (BoolVal True) 
@@ -111,58 +135,67 @@ isReturnFlagSet = isFlagSet returnFlagName
 isHaltFlagSet :: State EvalEnv Bool 
 isHaltFlagSet = isFlagSet haltFlagName
 
-initialEnv :: EvalEnv
-initialEnv = fromStore $ Map.singleton globalTableName Map.empty
-
-extendedEnv :: EvalEnv
-extendedEnv = fromStore m where 
-  m = Map.fromList
-    [ ( globalTableName,
-        Map.fromList
-          [ (StringVal "x", IntVal 3),
-            (StringVal "t", TableVal "_t1")
-          ]
-      ),
-      ( "_t1",
-        Map.fromList
-          [ (StringVal "y", BoolVal True),
-            (IntVal 2, TableVal "_t1")
-          ]
-      )
-    ]
-
-type Reference = (Name, Value)
-
 xref :: Reference
-xref = ("_G", StringVal "x")
+xref = GlobalRef "x"
+--xref = ("_G", StringVal "x")
 
 yref :: Reference
-yref = ("_t1", StringVal "y")
+yref = TableRef "_t1" (StringVal "y")
 
 tableFromState :: Name -> State EvalEnv (Maybe Table)
-tableFromState tname = Map.lookup tname . toStore <$> S.get
+tableFromState tname | tname == globalTableName = Just . C.gMap . context <$> S.get
+tableFromState tname = Map.lookup tname . tableMap <$> S.get
 
 index :: Reference -> State EvalEnv Value
-index (tableName, key) = do
-  t <- tableFromState tableName
-  case t of
-    Just t -> case Map.lookup key t of
-      Just v -> return v
-      _ -> return NilVal
-    _ -> return NilVal
+index (GlobalRef n) = do 
+  env <- S.get 
+  return $ case C.getGlobal (context env) n of 
+    Just v -> v 
+    _ -> NilVal
+index (LocalRef n) = do 
+  env <- S.get 
+  return $ case C.getLocal (context env) n of 
+    Just v -> v 
+    _ -> NilVal 
+index (TableRef tname tkey) = do 
+  env <- S.get 
+  return $ case Map.lookup tname (tableMap env) of 
+    Just table -> case Map.lookup tkey table of 
+      Just v -> v 
+      _ -> NilVal 
+    _ -> NilVal
+
+-- index (tableName, NilVal) = return NilVal
+-- index (tableName, key) = do
+--   mTable <- tableFromState tableName
+--   case mTable of
+--     Just table -> case Map.lookup key table of
+--       Just val -> return val
+--       _ -> return NilVal
+--     _ -> return NilVal
 
 update :: Reference -> Value -> State EvalEnv ()
-update (tableName, NilVal) newVal = S.get >>= \s -> return ()
-update (tableName, key) newVal = do
-  t <- tableFromState tableName
-  -- not right
-  S.modify (updateEnv t)
-  where
-    updateEnv :: Maybe Table -> EvalEnv -> EvalEnv 
-    updateEnv maybeTable env = 
-      case maybeTable of 
-        Nothing -> env
-        Just t -> fromStore (Map.insert tableName (Map.insert key newVal t) (toStore env))
+update (GlobalRef n) v = S.modify (\env -> env {context = C.addGlobal (n, v) (context env)}) 
+update (LocalRef n) v = S.modify (\env -> env {context = C.addLocal (n, v) (context env)}) 
+update (TableRef tname tkey) v = do 
+  mTable <- tableFromState tname
+  S.modify (updateTable mTable) where 
+  updateTable :: Maybe Table -> EvalEnv -> EvalEnv 
+  updateTable mt env = case mt of 
+    Nothing -> env 
+    Just t -> env {tableMap = (Map.insert tname (Map.insert tkey v t) (tableMap env))}
+
+
+-- update (tableName, NilVal) newVal = S.get >>= \s -> return ()
+-- update (tableName, key) newVal = do
+--   t <- tableFromState tableName
+--   S.modify (updateEnv t)
+--   where
+--     updateEnv :: Maybe Table -> EvalEnv -> EvalEnv 
+--     updateEnv maybeTable env = 
+--       case maybeTable of 
+--         Nothing -> env
+--         Just t -> fromStore (Map.insert tableName (Map.insert key newVal t) (toStore env))
 
 allocateTable :: [(Value, Value)] -> State EvalEnv Value
 allocateTable assocs = do
@@ -186,23 +219,24 @@ nonNil (k, v) = k /= NilVal && v /= NilVal
 -- when the var is `2.y` or `nil[2]` (i.e. not a `TableVal`)
 -- or when the var is t[nil]
 resolveVar :: Var -> State EvalEnv (Maybe Reference)
-resolveVar (Name n) = do
-  mGlobalTable <- tableFromState globalTableName
-  return $ case mGlobalTable of
-    Just globalTable -> Just (globalTableName, StringVal n)
-    _ -> Nothing
+resolveVar (Name n) = return $ Just $ GlobalRef n
+  
+  -- do
+  -- mGlobalTable <- tableFromState globalTableName
+  -- return $ case mGlobalTable of
+  --   Just globalTable -> Just (globalTableName, StringVal n)
+  --   _ -> Nothing
 resolveVar (Dot exp n) = do
-  mGlobalTable <- tableFromState globalTableName
   e <- evalE exp
-  return $ case (e, mGlobalTable) of
-    (TableVal tname, Just globalTable) -> Just (tname, StringVal n)
+  return $ case e of
+    TableVal tname -> Just (TableRef tname (StringVal n))
     _ -> Nothing
 resolveVar (Proj exp1 exp2) = do
   e1 <- evalE exp1
   e2 <- evalE exp2
   return $ case (e1, e2) of
     (_, NilVal) -> Nothing
-    (TableVal t1, v) -> Just (t1, v)
+    (TableVal t1, v) -> Just (TableRef t1 v)
     _ -> Nothing
 
 -- | Expression evaluator
