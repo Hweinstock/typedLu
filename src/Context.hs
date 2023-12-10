@@ -35,12 +35,27 @@ class Environment a v where
 
     index :: Reference -> State a v 
 
+    indexTable :: (Name, Value) -> v -> State a v
+
+    updateTable :: (Name, Value) -> v -> State a () 
+
+    indexWithDefault :: Reference -> v -> State a v 
+    indexWithDefault (GlobalRef n) d = do 
+        env <- S.get 
+        return $ case getGlobal n env of 
+            Just v -> v 
+            _ -> d
+    indexWithDefault (LocalRef n) d = do 
+        env <- S.get 
+        return $ case getLocal n env of 
+            Just v -> v 
+            _ -> d 
+    indexWithDefault (TableRef tname tkey) d = indexTable (tname, tkey) d
+
     update :: Reference -> v -> State a ()
     update (GlobalRef n) v = S.modify (addGlobal (n, v)) 
     update (LocalRef n) v = S.modify (addLocal (n, v))
     update (TableRef n k) v = updateTable (n, k) v 
-
-    updateTable :: (Name, Value) -> v -> State a () 
 
     addLocal :: (Name, v) -> a -> a 
     addLocal (n, v) env = let c = getContext env in
@@ -72,9 +87,6 @@ exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDept
 -- | Increase depth of scope. 
 enterScope :: Context a -> Context a
 enterScope c = c {curDepth = curDepth c + 1}
-
--- setGMap :: Context a -> Map Value a -> Context a
--- setGMap c m = c {gMap = m}
 
 emptyContext :: Context a 
 emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}

@@ -29,27 +29,19 @@ instance Environment EvalEnv Value where
 
   setContext :: EvalEnv -> Context Value -> EvalEnv 
   setContext env c = env {context = c}
+  
+  index :: Reference -> State EvalEnv Value 
+  index r = C.indexWithDefault r NilVal 
 
-  index :: Reference -> State EvalEnv Value
-  index (GlobalRef n) = do 
-    env <- S.get 
-    return $ case C.getGlobal n env of 
-      Just v -> v 
-      _ -> NilVal
-  index (LocalRef n) = do 
-    env <- S.get 
-    return $ case C.getLocal n env of 
-      Just v -> v 
-      _ -> NilVal 
-  index (TableRef tname tkey) = do 
+  indexTable :: (Name, Value) -> Value -> State EvalEnv Value
+  indexTable (tname, tkey) d = do 
     env <- S.get 
     return $ case Map.lookup tname (tableMap env) of 
       Just table -> case Map.lookup tkey table of 
         Just v -> v 
-        _ -> NilVal 
-      _ -> NilVal
+        _ -> d 
+      _ -> d
   
-    
   updateTable :: (Name, Value) -> Value -> State EvalEnv ()
   updateTable (tname, tkey) v = do 
     mTable <- tableFromState tname
@@ -82,8 +74,7 @@ fromStore s = case Map.lookup globalTableName s of
   Nothing -> emptyEvalEnv -- Shouldn't hit this cae.  
   Just globalTable -> newEnv where 
     newEnv = let initEnv = emptyEvalEnv in 
-      (C.setGMap globalTable initEnv) {tableMap = newTables}
-      -- initEnv {context = C.setGMap (context initEnv) globalTable, tableMap = newTables} 
+      (C.setGMap globalTable initEnv) {tableMap = newTables} 
         where 
           newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
 

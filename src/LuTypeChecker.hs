@@ -27,21 +27,16 @@ instance Environment TypeEnv LType where
     setContext :: TypeEnv -> Context LType -> TypeEnv 
     setContext env newContext = env {context = newContext}
 
-    index :: Reference -> State TypeEnv LType
-    index (GlobalRef n) = do 
-        env <- S.get 
-        return $ case C.getGlobal n env of 
-            Just v -> v 
-            _ -> NilType
-    index (LocalRef n) = do 
-        env <- S.get 
-        return $ case C.getLocal n env of 
-            Just v -> v 
-            _ -> UnknownType 
-    index (TableRef tname tkey) = return UnknownType
+    index :: Reference -> State TypeEnv LType 
+    index r@(GlobalRef _) = C.indexWithDefault r NilType  
+    index r@(LocalRef _) = C.indexWithDefault r UnknownType
+    index r = C.indexWithDefault r NilType
+
+    indexTable :: (Name, Value) -> LType -> State TypeEnv LType
+    indexTable _ = return
 
     updateTable :: (Name, Value) -> LType -> State TypeEnv ()
-    updateTable (tname, tkey) v = return ()
+    updateTable _ _ = return ()
 
 contextLookup :: Name -> State TypeEnv LType 
 contextLookup n = do 
