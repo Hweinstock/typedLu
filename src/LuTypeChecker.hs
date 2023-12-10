@@ -40,8 +40,8 @@ instance Environment TypeEnv LType where
             _ -> UnknownType 
     index (TableRef tname tkey) = return UnknownType
 
-    updateTable :: Reference -> LType -> State TypeEnv ()
-    updateTable (TableRef tname tkey) v = return ()
+    updateTable :: (Name, Value) -> LType -> State TypeEnv ()
+    updateTable (tname, tkey) v = return ()
 
 contextLookup :: Name -> State TypeEnv LType 
 contextLookup n = do 

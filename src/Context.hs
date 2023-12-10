@@ -38,9 +38,9 @@ class Environment a v where
     update :: Reference -> v -> State a ()
     update (GlobalRef n) v = S.modify (addGlobal (n, v)) 
     update (LocalRef n) v = S.modify (addLocal (n, v))
-    update t v = updateTable t v 
+    update (TableRef n k) v = updateTable (n, k) v 
 
-    updateTable :: Reference -> v -> State a () 
+    updateTable :: (Name, Value) -> v -> State a () 
 
     addLocal :: (Name, v) -> a -> a 
     addLocal (n, v) env = let c = getContext env in

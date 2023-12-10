@@ -48,9 +48,10 @@ instance Environment EvalEnv Value where
         Just v -> v 
         _ -> NilVal 
       _ -> NilVal
+  
     
-  updateTable :: Reference -> Value -> State EvalEnv ()
-  updateTable (TableRef tname tkey) v = do 
+  updateTable :: (Name, Value) -> Value -> State EvalEnv ()
+  updateTable (tname, tkey) v = do 
     mTable <- tableFromState tname
     S.modify (updateTableHelper mTable) where 
       updateTableHelper :: Maybe Table -> EvalEnv -> EvalEnv 
