@@ -2,7 +2,7 @@ module LuE2ETest where
 
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
-import LuEvaluator (Store, eval, index, globalTableName, EvalEnv, toStore)
+import LuEvaluator (Store, eval, globalTableName, EvalEnv, toStore)
 import LuEvaluatorTest (initialEnv)
 import LuTypeChecker (typeCheckAST, runForContext, getUncalledFunc, TypeEnv, contextLookup)
 import Context (Context) 

@@ -41,17 +41,17 @@ test_index =
   "index tests" ~:
     TestList
       [ -- The global variable "x" is unitialized (i.e. not present in the initial store)
-        S.evalState (index xref) initialEnv ~?= NilVal,
+        S.evalState (C.index xref) initialEnv ~?= NilVal,
         -- But there is a value for "x" available in the extended store
-        S.evalState (index xref) extendedEnv ~?= IntVal 3,
+        S.evalState (C.index xref) extendedEnv ~?= IntVal 3,
         -- If a table name is not found in the store, accessing its reference also returns nil.
-        S.evalState (index yref) initialEnv ~?= NilVal,
+        S.evalState (C.index yref) initialEnv ~?= NilVal,
         -- We should also be able to access "t[1]" in the extended store
-        S.evalState (index yref) extendedEnv ~?= BoolVal True,
-        S.evalState (index (TableRef "z" NilVal)) extendedEnv ~?= NilVal,
+        S.evalState (C.index yref) extendedEnv ~?= BoolVal True,
+        S.evalState (C.index (TableRef "z" NilVal)) extendedEnv ~?= NilVal,
         -- Updates using the `nil` key are ignored
         toStore (S.execState (C.update (TableRef "_t" NilVal) (IntVal 3)) extendedEnv) ~?= toStore extendedEnv,
-        S.evalState (index (GlobalRef "t")) extendedEnv ~?= TableVal "_t1"
+        S.evalState (C.index (GlobalRef "t")) extendedEnv ~?= TableVal "_t1"
       ]
 
 test_update :: Test
@@ -59,13 +59,13 @@ test_update =
   "index tests" ~:
     TestList
       [ -- If we assign to x, then we can find its new value
-        S.evalState (C.update xref (IntVal 4) >> index xref) initialEnv ~?= IntVal 4,
+        S.evalState (C.update xref (IntVal 4) >> C.index xref) initialEnv ~?= IntVal 4,
         -- If we assign to x, then remove it, we cannot find it anymore
-        S.evalState (C.update xref (IntVal 4) >> C.update xref NilVal >> index xref) initialEnv ~?= NilVal,
+        S.evalState (C.update xref (IntVal 4) >> C.update xref NilVal >> C.index xref) initialEnv ~?= NilVal,
         -- If we assign to t.y, then we can find its new value
-        S.evalState (C.update yref (IntVal 5) >> index yref) extendedEnv ~?= IntVal 5,
+        S.evalState (C.update yref (IntVal 5) >> C.index yref) extendedEnv ~?= IntVal 5,
         -- If we assign nil to t.y, then we cannot find it
-        S.evalState (C.update yref NilVal >> index yref) extendedEnv ~?= NilVal
+        S.evalState (C.update yref NilVal >> C.index yref) extendedEnv ~?= NilVal
       ]
 
 test_resolveVar :: Test
