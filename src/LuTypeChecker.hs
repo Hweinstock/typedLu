@@ -69,12 +69,6 @@ getUncalledFunc env n = Map.lookup n (uncalledFuncs env)
 removeUncalledFunc :: TypeEnv -> Name -> TypeEnv 
 removeUncalledFunc env n = env {uncalledFuncs = Map.delete n (uncalledFuncs env)}
 
--- enterEnvScope :: TypeEnv -> TypeEnv 
--- enterEnvScope env = env {context = C.enterScope (context env)}
-
--- exitEnvScope :: TypeEnv -> TypeEnv 
--- exitEnvScope env = env {context = C.exitScope (context env)}
-
 type TypecheckerState a = State TypeEnv (Either String a)
 
 class Synthable a where 

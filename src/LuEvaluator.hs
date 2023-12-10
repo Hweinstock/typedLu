@@ -61,12 +61,6 @@ instance Environment EvalEnv Value where
         Nothing -> env 
         Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
 
--- enterEnvScope :: EvalEnv -> EvalEnv 
--- enterEnvScope env = env {context = C.enterScope (context env)}
-
--- exitEnvScope :: EvalEnv -> EvalEnv 
--- exitEnvScope env = env {context = C.exitScope (context env)}
-
 resolveVar :: Var -> State EvalEnv (Maybe Reference)
 resolveVar (Name n) = do 
   env <- S.get
