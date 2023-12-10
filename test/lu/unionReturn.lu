@@ -1,0 +1,13 @@
+function foo(x : int) : string | int 
+    if x > 5 then 
+        return "here"
+    else 
+        return 1 
+    end 
+end 
+
+z = foo(10)
+z2 = foo(4)
+
+result = z == z2
+

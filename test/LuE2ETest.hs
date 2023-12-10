@@ -194,7 +194,8 @@ test_typeCheck =
                 "nestedFuncReturnTypeBad" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad.lu" False,
                 "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False, 
                 "nameShadow" ~: testTypeCheckFile "test/lu/nameShadow.lu" True, 
-                "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False  
+                "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False, 
+                "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" False 
 
             ]
 
