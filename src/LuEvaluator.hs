@@ -7,7 +7,7 @@ import Data.Map qualified as Map
 import LuParser qualified
 import LuSyntax
 import LuTypes
-import Context (Context, Environment, Reference (LocalRef, GlobalRef, TableRef))
+import Context (Context, Environment, Reference (LocalRef, GlobalRef, TableRef), ExtendedContext)
 import Context qualified as C
 import State (State)
 import State qualified as S
@@ -22,6 +22,16 @@ data EvalEnv = EvalEnv {
   context :: Context Value,
   tableMap :: Map Name Table
 } deriving Show
+
+instance ExtendedContext EvalEnv where 
+  emptyContext :: EvalEnv
+  emptyContext = EvalEnv {context = C.emptyContext, tableMap = Map.empty}
+
+  exitScope :: EvalEnv -> EvalEnv 
+  exitScope env = env {context = C.exitScope (context env)}
+
+  enterScope :: EvalEnv -> EvalEnv 
+  enterScope env = env {context = C.enterScope (context env)}
 
 instance Environment EvalEnv Value where 
   getContext :: EvalEnv -> Context Value 
@@ -51,11 +61,11 @@ instance Environment EvalEnv Value where
         Nothing -> env 
         Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
 
-enterEnvScope :: EvalEnv -> EvalEnv 
-enterEnvScope env = env {context = C.enterScope (context env)}
+-- enterEnvScope :: EvalEnv -> EvalEnv 
+-- enterEnvScope env = env {context = C.enterScope (context env)}
 
-exitEnvScope :: EvalEnv -> EvalEnv 
-exitEnvScope env = env {context = C.exitScope (context env)}
+-- exitEnvScope :: EvalEnv -> EvalEnv 
+-- exitEnvScope env = env {context = C.exitScope (context env)}
 
 resolveVar :: Var -> State EvalEnv (Maybe Reference)
 resolveVar (Name n) = do 
@@ -83,18 +93,15 @@ toStore env = Map.insert globalTableName (C.gMap (context env)) (tableMap env)
 
 fromStore :: Store -> EvalEnv 
 fromStore s = case Map.lookup globalTableName s of 
-  Nothing -> emptyEvalEnv -- Shouldn't hit this cae.  
+  Nothing -> C.emptyContext -- Shouldn't hit this cae.  
   Just globalTable -> newEnv where 
-    newEnv = let initEnv = emptyEvalEnv in 
+    newEnv = let initEnv = C.emptyContext in 
       (C.setGMap globalTable initEnv) {tableMap = newTables} 
         where 
           newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
 
 instance PP EvalEnv where 
   pp env = undefined 
-
-emptyEvalEnv :: EvalEnv 
-emptyEvalEnv = EvalEnv {context = C.emptyContext, tableMap = Map.empty}
 
 globalTableName :: Name
 globalTableName = "_G"
@@ -167,9 +174,9 @@ allocateTable assocs = do
   let n = length (Map.keys store)
   let tableName = "_t" ++ show n
   -- make sure we don't have a nil key or value
-  let assocs' = filter nonNil assocs
+  let assocs' = Map.fromList (filter nonNil assocs)
   -- update the store
-  S.put (fromStore (Map.insert tableName (Map.fromList assocs') store))
+  S.modify (\env -> env {tableMap = Map.insert tableName assocs' (tableMap env)})
   return (TableVal tableName)
 
 -- Keep nil out of the table
@@ -205,7 +212,7 @@ evalE e = do
           C.prepareFunctionEnv extParameters 
           eval b 
           returnValue <- evalE (Var (Name returnValueName)) 
-          S.modify exitEnvScope
+          S.modify C.exitScope
           return returnValue
         _ -> return NilVal
 

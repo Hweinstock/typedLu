@@ -9,6 +9,7 @@ import Text.Read (readMaybe)
 import Data.List qualified as List
 import State (State)
 import State qualified as S
+import Context qualified as C
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
@@ -69,7 +70,7 @@ initialStepper =
   Stepper
     { filename = Nothing,
       block = mempty,
-      env = emptyEvalEnv,
+      env = C.emptyContext,
       history = Nothing
     }
 

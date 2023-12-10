@@ -8,7 +8,7 @@ import Data.Map (Map)
 import Data.List (nub)
 import qualified Data.Map as Map
 import qualified Stack
-import Context (Context, Reference (GlobalRef, LocalRef, TableRef), Environment)
+import Context (Context, Reference (GlobalRef, LocalRef, TableRef), Environment, ExtendedContext)
 import qualified Context as C
 import LuTypes 
 
@@ -19,6 +19,16 @@ data TypeEnv = TypeEnv {
     uncalledFuncs :: Map Name Value, 
     context :: Context LType
 } deriving Show 
+
+instance ExtendedContext TypeEnv where 
+    emptyContext :: TypeEnv 
+    emptyContext = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
+
+    enterScope :: TypeEnv -> TypeEnv 
+    enterScope env = env {context = C.enterScope (context env)}
+
+    exitScope :: TypeEnv -> TypeEnv 
+    exitScope env = env {context = C.exitScope (context env)}
 
 instance Environment TypeEnv LType where 
     getContext :: TypeEnv -> Context LType 
@@ -59,11 +69,11 @@ getUncalledFunc env n = Map.lookup n (uncalledFuncs env)
 removeUncalledFunc :: TypeEnv -> Name -> TypeEnv 
 removeUncalledFunc env n = env {uncalledFuncs = Map.delete n (uncalledFuncs env)}
 
-enterEnvScope :: TypeEnv -> TypeEnv 
-enterEnvScope env = env {context = C.enterScope (context env)}
+-- enterEnvScope :: TypeEnv -> TypeEnv 
+-- enterEnvScope env = env {context = C.enterScope (context env)}
 
-exitEnvScope :: TypeEnv -> TypeEnv 
-exitEnvScope env = env {context = C.exitScope (context env)}
+-- exitEnvScope :: TypeEnv -> TypeEnv 
+-- exitEnvScope env = env {context = C.exitScope (context env)}
 
 type TypecheckerState a = State TypeEnv (Either String a)
 
@@ -97,7 +107,7 @@ instance Synthable Value where
     synth (FunctionVal pms rt b) = do 
         C.prepareFunctionEnv ((returnTypeName, rt) : pms)
         s <- S.get
-        S.modify exitEnvScope
+        S.modify C.exitScope
         case S.evalState (typeCheckBlock b) s of 
             Right () -> do 
                 return $ Right $ synthFunc pms rt
@@ -323,7 +333,7 @@ typeCheckFuncBody n = do
             C.prepareFunctionEnv ((returnTypeName, rt) : pms)
             S.modify (\env -> removeUncalledFunc env n)
             res <- typeCheckBlock b 
-            S.modify exitEnvScope 
+            S.modify C.exitScope 
             return res
         _ -> return $ Right ()
 

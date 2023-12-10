@@ -27,6 +27,11 @@ data LocalVar a = LocalVar {
     depth :: Int
 }
 
+class ExtendedContext ce where 
+    emptyContext :: ce 
+    exitScope :: ce -> ce 
+    enterScope :: ce -> ce 
+
 class Environment a v where 
     getContext :: a -> Context v 
     setContext :: a -> Context v -> a 
@@ -82,19 +87,19 @@ class Environment a v where
         S.modify (\env -> setContext env (enterScope (getThisContext env)))
         S.modify (\e -> foldr addLocal e params)
     
+instance ExtendedContext (Context a) where 
+    emptyContext :: Context a 
+    emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
 
--- | Decrease depth of scope and remove variables at this level. 
-exitScope :: Context a -> Context a
-exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
-    aboveDepth :: Int -> LocalVar a -> Bool 
-    aboveDepth n lv = depth lv < curDepth c
+    -- | Decrease depth of scope and remove variables at this level. 
+    exitScope :: Context a -> Context a
+    exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
+        aboveDepth :: Int -> LocalVar a -> Bool 
+        aboveDepth n lv = depth lv < curDepth c
 
--- | Increase depth of scope. 
-enterScope :: Context a -> Context a
-enterScope c = c {curDepth = curDepth c + 1}
-
-emptyContext :: Context a 
-emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
+    -- | Increase depth of scope. 
+    enterScope :: Context a -> Context a
+    enterScope c = c {curDepth = curDepth c + 1}
 
 instance Show a => Show (LocalVar a) where 
     show :: LocalVar a -> String 
