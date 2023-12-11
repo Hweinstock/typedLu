@@ -153,10 +153,10 @@ isPolymorphicBop Le = True
 isPolymorphicBop _ = False
 
 typeCheckAST :: Block -> TypeEnv -> Either String ()
-typeCheckAST b = S.evalState (typeCheckBlock b)
+typeCheckAST b = S.evalState (typeCheckBlock b Never)
 
 runForEnv :: Block -> TypeEnv -> Either String TypeEnv
-runForEnv b env = case S.runState (typeCheckBlock b) env of
+runForEnv b env = case S.runState (typeCheckBlock b Never) env of
   (Right (), finalStore) -> Right finalStore
   (Left l, finalStore) -> Left l
 
@@ -180,44 +180,44 @@ throwError errorType expectedType exp = do
             ++ show env
 
 -- | typeCheck blocks individually, with some state.
-typeCheckBlocks :: TypeEnv -> [Block] -> Either String ()
-typeCheckBlocks env = foldr checkBlock (Right ())
+typeCheckBlocks :: TypeEnv -> LType -> [Block] -> Either String ()
+typeCheckBlocks env expectedReturnType = foldr checkBlock (Right ())
   where
     checkBlock :: Block -> Either String () -> Either String ()
     checkBlock b l@(Left _) = l
-    checkBlock b _ = S.evalState (typeCheckBlock b) env
+    checkBlock b _ = S.evalState (typeCheckBlock b expectedReturnType) env
 
 -- | Check that given expression is boolean, then check underlying blocks.
-typeCheckCondtionalBlocks :: Expression -> [Block] -> String -> TypecheckerState ()
-typeCheckCondtionalBlocks exp bs errorStr = do
+typeCheckCondtionalBlocks :: Expression -> LType -> [Block] -> String -> TypecheckerState ()
+typeCheckCondtionalBlocks exp expectedReturnType bs errorStr = do
   eRes <- checker exp BooleanType
   curStore <- S.get
   case eRes of
-    Right True -> return $ typeCheckBlocks curStore bs
+    Right True -> return $ typeCheckBlocks curStore expectedReturnType bs
     _ -> return $ Left errorStr
 
--- | Given a block and an environment, check if the types are consistent in the block.
-typeCheckBlock :: Block -> TypecheckerState ()
-typeCheckBlock (Block (s : ss)) = do
-  curCheck <- typeCheckStatement s
+-- | Given a block, an environment, and an expected return type, check if the types are consistent in the block.
+typeCheckBlock :: Block -> LType -> TypecheckerState ()
+typeCheckBlock (Block (s : ss)) expectedReturnType = do
+  curCheck <- typeCheckStatement s expectedReturnType
   case curCheck of
     l@(Left _) -> return l
-    Right () -> typeCheckBlock (Block ss)
-typeCheckBlock (Block []) = return $ Right ()
+    Right () -> typeCheckBlock (Block ss) expectedReturnType
+typeCheckBlock (Block []) expectedReturnType = return $ Right ()
 
--- | Given a statement and an environment, check if the types are consistent in the statement.
-typeCheckStatement :: Statement -> TypecheckerState ()
-typeCheckStatement (Assign (v, UnknownType) exp) = do
+-- | Given a statement, an environment and an expected return type, check if the types are consistent in the statement.
+typeCheckStatement :: Statement -> LType -> TypecheckerState ()
+typeCheckStatement (Assign (v, UnknownType) exp) expectedReturnType = do
   eTexp <- synthesis exp
   case eTexp of
     Right t -> typeCheckAssign v t exp
     Left l -> return $ Left l
-typeCheckStatement (Assign (v, t) exp) = typeCheckAssign v t exp
-typeCheckStatement (If exp b1 b2) = typeCheckCondtionalBlocks exp [b1, b2] "Non-boolean in if condition"
-typeCheckStatement (While exp b) = typeCheckCondtionalBlocks exp [b] "Non-boolean in while condition"
-typeCheckStatement Empty = return $ Right ()
-typeCheckStatement (Repeat b exp) = typeCheckCondtionalBlocks exp [b] "Non-boolean in repeat condition"
-typeCheckStatement (Return exp) = do
+typeCheckStatement (Assign (v, t) exp) expectedReturnType = typeCheckAssign v t exp
+typeCheckStatement (If exp b1 b2) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b1, b2] "Non-boolean in if condition"
+typeCheckStatement (While exp b) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in while condition"
+typeCheckStatement Empty expectedReturnType = return $ Right ()
+typeCheckStatement (Repeat b exp) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in repeat condition"
+typeCheckStatement (Return exp) expectedReturnType = do
   eExpectedType <- synth (Name returnTypeName)
   case eExpectedType of
     Left error -> return $ Left error
@@ -282,7 +282,7 @@ updateEnv n t exp = do
       C.prepareFunctionEnv ((returnTypeName, rt) : pms)
       s <- S.get
       S.modify C.exitScope
-      return $ S.evalState (typeCheckBlock b) s
+      return $ S.evalState (typeCheckBlock b rt) s
     _ -> return $ Right ()
 
 checkSameType :: Expression -> Expression -> TypecheckerState Bool
@@ -305,7 +305,7 @@ synthCall (FunctionType paramType returnType) (p : ps) = do
     Right True -> synthCall nextFunction ps
 synthCall t _ = do
   env <- S.get
-  return $ Left ("CallNonFunc: Cannot call type [" ++ show t ++ "]" ++ (show env))
+  return $ Left ("CallNonFunc: Cannot call type [" ++ show t ++ "]" ++ show env)
 
 synthOp2 :: Bop -> Expression -> Expression -> TypecheckerState LType
 synthOp2 op e1 e2 = do
@@ -329,8 +329,8 @@ typeCheckFuncBody n = do
   case funcValue of
     Just (FunctionVal pms rt b) -> do
       C.prepareFunctionEnv ((returnTypeName, rt) : pms)
-      S.modify (\env -> removeUncalledFunc env n)
-      res <- typeCheckBlock b
+      S.modify (`removeUncalledFunc` n)
+      res <- typeCheckBlock b rt
       S.modify C.exitScope
       return res
     _ -> return $ Right ()
