@@ -2,39 +2,41 @@ module LuE2ETest where
 
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
-import LuEvaluator (Store, eval, globalTableName, EvalEnv, toStore, errorCodeName, haltFlagName)
+import LuEvaluator (Store, eval, globalTableName, EvalEnv, toStore, errorCodeName, haltFlagName, exec)
 import LuEvaluatorTest (initialEnv)
 import LuTypeChecker (typeCheckAST, runForEnv, getUncalledFunc, TypeEnv, contextLookup)
-import Context (Context) 
+import Context (Context, ExtendedContext) 
 import Context qualified as C
 import LuSyntax
 import LuTypes
 import State qualified as S
 import Data.Map qualified as Map
 
+
+processFileForStore :: ExtendedContext env => String -> (Block -> env -> Either String env) -> IO (Either String env)
+processFileForStore fp execBlock = do 
+    parseResult <- parseLuFile fp 
+    return $ case parseResult of 
+        (Left _) -> Left "Failed to parse file"
+        (Right ast) -> execBlock ast C.emptyContext
+
 -- | Parse and run file to get resulting Store (or error message)
 runFileForStore :: String -> IO (Either String EvalEnv)
-runFileForStore fp = do
-    parseResult <- parseLuFile fp
-    case parseResult of 
-        (Left _) -> do 
-            return $ Left "Failed to parse file"
-        (Right ast) -> do 
-            let finalState = S.execState (eval ast) initialEnv
-            return $ Right finalState
+runFileForStore fp = processFileForStore fp exec 
 
--- | Parse and run typechecker on file to get resulting Store (or error message)
--- TOOD: generalize with above. 
-typeCheckFileForStore :: String -> IO (Either String TypeEnv)
-typeCheckFileForStore fp = do 
-    parseResult <- parseLuFile fp 
-    case parseResult of 
-        (Left _) -> do 
-            return $ Left "Failed to parse file"
-        (Right ast) -> do 
-            return $ case runForEnv ast of 
-                Right s -> Right s
-                Left m -> Left m 
+typeCheckFileForStore :: String -> IO (Either String TypeEnv) 
+typeCheckFileForStore fp = processFileForStore fp runForEnv
+
+checkThrowsError :: String -> String -> IO Bool
+checkThrowsError fp err = do 
+    result <- runFileForStore fp 
+    return $ case result of 
+        Left s -> s == err 
+        _ -> False
+
+testIOResult :: IO Bool -> IO () 
+testIOResult b = b >>= assert
+
 
 checkVarProperty :: String -> (Value -> Bool) -> EvalEnv -> Either String Bool 
 checkVarProperty targetName property s = case Map.lookup globalTableName (toStore s) of 
@@ -84,7 +86,7 @@ testTypeCheckFile fp flipped = do
     parseResult <- parseLuFile fp 
     case parseResult of 
         (Left l) -> assert False
-        Right ast -> case typeCheckAST ast of 
+        Right ast -> case typeCheckAST ast C.emptyContext of 
             (Left l) -> assert (not flipped)
             _ -> assert flipped
 
@@ -93,7 +95,7 @@ getTypeEnvFile fp = do
     parseResult <- parseLuFile fp 
     case parseResult of 
         (Left l) -> return $ Left l
-        Right ast -> case runForEnv ast of 
+        Right ast -> case runForEnv ast C.emptyContext of 
             (Left l2) -> return $ Left l2
             Right store -> return $ Right store
 
@@ -225,8 +227,8 @@ test_error =
     "e2e error" ~: 
         TestList 
             [ 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), (haltFlagName, BoolVal True), (errorCodeName, ErrorVal IllegalArguments)]), 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), (haltFlagName, BoolVal True), (errorCodeName, ErrorVal DivideByZero)]) 
+                "IllegalArguments1" ~: testIOResult $ checkThrowsError "test/lu/error1.lu" (show IllegalArguments), 
+                "DivideByZero" ~: testIOResult $ checkThrowsError "test/lu/error2.lu" (show DivideByZero)
             ]
 test :: IO Counts 
 test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]

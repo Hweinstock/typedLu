@@ -145,6 +145,18 @@ isError :: Value -> Bool
 isError (ErrorVal _) = True 
 isError _ = False 
 
+didError :: EvalEnv -> Bool 
+didError env = 
+  case S.evalState (C.index haltFlagRef) env of
+    (BoolVal True) -> True
+    _ -> False
+
+getError :: EvalEnv -> ErrorCode 
+getError env = 
+  case S.evalState (C.index errorCodeRef) env of 
+    (ErrorVal e) -> e 
+    _ -> UnknownError
+
 isFlagSet :: Name -> State EvalEnv Bool 
 isFlagSet n = do 
   value <- evalE (Var (Name n))
@@ -329,5 +341,13 @@ evalS s = continueWithFlags () (doEvalS s) where
   doEvalS (Return e) = evalS (Assign (Name returnValueName, UnknownType) e) >> evalS (Assign (Name returnFlagName, BooleanType) (Val (BoolVal True)))
   doEvalS Empty = return () -- do nothing
 
-exec :: Block -> EvalEnv -> EvalEnv
-exec = S.execState . eval
+execWithoutError :: Block -> EvalEnv -> EvalEnv 
+execWithoutError = S.execState . eval
+
+exec :: Block -> EvalEnv -> Either String EvalEnv
+exec b env = let finalEnv = S.execState (eval b) env in
+  if didError finalEnv then 
+    Left $ (show . getError) finalEnv
+  else 
+    return finalEnv
+

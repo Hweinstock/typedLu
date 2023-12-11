@@ -53,7 +53,7 @@ data Value
   | ErrorVal ErrorCode
   deriving (Eq, Show)
 
-data ErrorCode = IllegalArguments | DivideByZero deriving (Eq, Show, Enum)
+data ErrorCode = IllegalArguments | DivideByZero | UnknownError deriving (Eq, Show, Enum)
 
 type Parameter = (Name, LType) 
   

@@ -201,13 +201,13 @@ test_error =
 tExecTest :: Test
 tExecTest =
   "exec wTest" ~:
-    toStore (exec wTest initialEnv)
+    toStore (execWithoutError wTest initialEnv)
       ~?= Map.fromList [(globalTableName, Map.fromList [(StringVal "x", IntVal 0), (StringVal "y", IntVal 10)])]
 
 tExecFact :: Test
 tExecFact =
   "exec wFact" ~:
-    toStore (exec wFact initialEnv)
+    toStore (execWithoutError wFact initialEnv)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList
@@ -222,7 +222,7 @@ tExecFact =
 tExecAbs :: Test
 tExecAbs =
   "exec wAbs" ~:
-    toStore (exec wAbs initialEnv)
+    toStore (execWithoutError wAbs initialEnv)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList [(StringVal "x", IntVal 3)]
@@ -232,7 +232,7 @@ tExecAbs =
 tExecTimes :: Test
 tExecTimes =
   "exec wTimes" ~:
-    toStore (exec wTimes initialEnv)
+    toStore (execWithoutError wTimes initialEnv)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList [(StringVal "x", IntVal 0), (StringVal "y", IntVal 3), (StringVal "z", IntVal 30)]
@@ -242,7 +242,7 @@ tExecTimes =
 tExecTable :: Test
 tExecTable =
   "exec wTable" ~:
-    toStore (exec wTable initialEnv)
+    toStore (execWithoutError wTable initialEnv)
       ~?= Map.fromList
         [ ( globalTableName,
             Map.fromList
@@ -259,7 +259,7 @@ tExecTable =
 tExecBfs :: Test
 tExecBfs = "exec wBfs" ~: TestList [global !? StringVal "found" ~?= Just (BoolVal True)]
   where
-    ss = toStore (exec wBfs initialEnv)
+    ss = toStore (execWithoutError wBfs initialEnv)
     global = case ss !? globalTableName of
       Just g -> g
       Nothing -> Map.empty
