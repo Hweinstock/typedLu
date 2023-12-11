@@ -228,6 +228,7 @@ instance PP TypedVar where
 
 instance PP LType where 
   pp Never = PP.text "never"
+  pp AnyType = PP.text "any"
   pp UnknownType = PP.text "unknown"
   pp NilType = PP.text "nil"
   pp IntType = PP.text "int"
@@ -352,8 +353,8 @@ quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
 -- reserved words
-genName :: Gen Name
-genName = QC.elements ["_", "_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
+genName :: Map LType [Name] -> Gen Name
+genName _ = QC.elements ["_", "_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
 
 -- | Generate a string literal, being careful about the characters that it may contain
 genStringLit :: Gen String
@@ -367,79 +368,79 @@ genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
     stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
 
 -- | Generate a size-controlled global variable or table field
-genVar :: Int -> Gen Var
-genVar 0 = Name <$> genName
-genVar n =
+genVar :: Map LType [Name] -> Int -> Gen Var
+genVar m 0 = Name <$> genName m
+genVar m n =
   QC.frequency
-    [ (1, Name <$> genName),
-      (n, Dot <$> genExp n' <*> genName),
-      (n, Proj <$> genExp n' <*> genExp n')
+    [ (1, Name <$> genName m),
+      (n, Dot <$> genExp m n' <*> genName m),
+      (n, Proj <$> genExp m n' <*> genExp m n')
     ]
   where
     n' = n `div` 2
 
-genTypedVar :: Int -> Gen TypedVar
-genTypedVar n = liftA2 (,) (genVar n) arbitrary
+genTypedVar :: Map LType [Name] -> Int -> Gen TypedVar
+genTypedVar m n = liftA2 (,) (genVar m n) arbitrary
 
 -- | Generate a size-controlled expression
-genExp :: Int -> Gen Expression
-genExp 0 = QC.oneof [Var <$> genVar 0, Val <$> arbitrary]
-genExp n =
+genExp :: Map LType [Name] -> Int -> Gen Expression
+genExp m 0 = QC.oneof [Var <$> genVar m 0, Val <$> arbitrary]
+genExp m n =
   QC.frequency
-    [ (1, Var <$> genVar n),
+    [ (1, Var <$> genVar m n),
       (1, Val <$> arbitrary),
-      (n, Op1 <$> arbitrary <*> genExp n'),
-      (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
-      (n', TableConst <$> genTableFields n')
+      (n, Op1 <$> arbitrary <*> genExp m n'),
+      (n, Op2 <$> genExp m n' <*> arbitrary <*> genExp m n'),
+      (n', TableConst <$> genTableFields m n')
     ]
   where
     n' = n `div` 2
 
 -- | Generate a list of fields in a table constructor epression.
 -- We limit the size of the table to avoid size blow up.
-genTableFields :: Int -> Gen [TableField]
-genTableFields n = do
+genTableFields :: Map LType [Name] -> Int -> Gen [TableField]
+genTableFields m n = do
   len <- QC.elements [0 .. 3]
-  take len <$> QC.infiniteListOf (genTableField n)
+  take len <$> QC.infiniteListOf (genTableField m n)
 
-genTableField :: Int -> Gen TableField
-genTableField n =
+genTableField :: Map LType [Name] -> Int -> Gen TableField
+genTableField m n =
   QC.oneof
-    [ FieldName <$> genName <*> genExp n',
-      FieldKey <$> genExp n' <*> genExp n'
+    [ FieldName <$> genName m <*> genExp m n',
+      FieldKey <$> genExp m n' <*> genExp m n'
     ]
   where
     n' = n `div` 2
 
 -- | Generate a size-controlled statement
-genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = QC.oneof [Assign <$> genTypedVar 0 <*> genExp 0, return Empty]
-genStatement n =
+genStatement :: Map LType [Name] -> Int -> Gen Statement
+genStatement m n | n <= 1 = QC.oneof [Assign <$> genTypedVar m 0 <*> genExp m 0, return Empty]
+genStatement m n =
   QC.frequency
-    [ (1, Assign <$> genTypedVar n' <*> genExp n'),
+    [ (1, Assign <$> genTypedVar m n' <*> genExp m n'),
       (1, return Empty),
-      (n, If <$> genExp n' <*> genBlock n' <*> genBlock n'),
+      (n, If <$> genExp m n' <*> genBlock m n' <*> genBlock m n'),
       -- generate loops half as frequently as if statements
-      (n', While <$> genExp n' <*> genBlock n'),
-      (n', Repeat <$> genBlock n' <*> genExp n')
+      (n', While <$> genExp m n' <*> genBlock m n'),
+      (n', Repeat <$> genBlock m n' <*> genExp m n')
     ]
   where
     n' = n `div` 2
 
-genBlock :: Int -> Gen Block
-genBlock n = Block <$> genStmts n
+genBlock :: Map LType [Name] -> Int -> Gen Block
+genBlock m n = Block <$> genStmts n
   where
     genStmts 0 = pure []
     genStmts n =
       QC.frequency
         [ (1, return []),
-          (n, (:) <$> genStatement n' <*> genStmts n')
+          (n, (:) <$> genStatement m n' <*> genStmts n')
         ]
       where
         n' = n `div` 2
 
 instance Arbitrary Var where
-  arbitrary = QC.sized genVar
+  arbitrary = QC.sized (genVar Map.empty)
   shrink (Name n) = []
   shrink (Dot e n) = [Dot e' n | e' <- shrink e]
   shrink (Proj e1 e2) =
@@ -447,7 +448,7 @@ instance Arbitrary Var where
       ++ [Proj e1 e2' | e2' <- shrink e2]
 
 instance Arbitrary Statement where
-  arbitrary = QC.sized genStatement
+  arbitrary = QC.sized (genStatement Map.empty)
   shrink (Assign v e) =
     [Assign v' e | v' <- shrink v]
       ++ [Assign v e' | e' <- shrink e]
@@ -478,18 +479,18 @@ getExp (FieldName _ e) = [e]
 getExp (FieldKey e1 e2) = [e1, e2]
 
 instance Arbitrary TableField where
-  arbitrary = QC.sized genTableField
+  arbitrary = QC.sized (genTableField Map.empty)
   shrink (FieldName n e1) = [FieldName n e1' | e1' <- shrink e1]
   shrink (FieldKey e1 e2) =
     [FieldKey e1' e2 | e1' <- shrink e1]
       ++ [FieldKey e1 e2' | e2' <- shrink e2]
 
 instance Arbitrary Block where
-  arbitrary = QC.sized genBlock
+  arbitrary = QC.sized (genBlock Map.empty)
   shrink (Block ss) = [Block ss' | ss' <- shrink ss]
 
 instance Arbitrary Expression where
-  arbitrary = QC.sized genExp
+  arbitrary = QC.sized (genExp Map.empty)
 
   shrink (Val v) = Val <$> shrink v
   shrink (Var v) = Var <$> shrink v
