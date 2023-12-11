@@ -153,11 +153,13 @@ isPolymorphicBop Le = True
 isPolymorphicBop _ = False
 
 typeCheckAST :: Block -> TypeEnv -> Either String ()
-typeCheckAST b = S.evalState (typeCheckBlock b Never)
+typeCheckAST b env = case S.evalState (typeCheckBlock b Never) env of
+  Right t -> Right ()
+  Left l -> Left l
 
 runForEnv :: Block -> TypeEnv -> Either String TypeEnv
 runForEnv b env = case S.runState (typeCheckBlock b Never) env of
-  (Right (), finalStore) -> Right finalStore
+  (Right t, finalStore) -> Right finalStore
   (Left l, finalStore) -> Left l
 
 throwError :: String -> LType -> Expression -> TypecheckerState a
@@ -180,15 +182,17 @@ throwError errorType expectedType exp = do
             ++ show env
 
 -- | typeCheck blocks individually, with some state.
-typeCheckBlocks :: TypeEnv -> LType -> [Block] -> Either String ()
-typeCheckBlocks env expectedReturnType = foldr checkBlock (Right ())
+typeCheckBlocks :: TypeEnv -> LType -> [Block] -> Either String LType
+typeCheckBlocks env expectedReturnType = foldr checkBlock (Right Never)
   where
-    checkBlock :: Block -> Either String () -> Either String ()
+    checkBlock :: Block -> Either String LType -> Either String LType
     checkBlock b l@(Left _) = l
-    checkBlock b _ = S.evalState (typeCheckBlock b expectedReturnType) env
+    checkBlock b (Right prevT) = case S.evalState (typeCheckBlock b expectedReturnType) env of
+      l@(Left _) -> l
+      Right nextT -> Right $ constructUnionType [prevT, nextT]
 
 -- | Check that given expression is boolean, then check underlying blocks.
-typeCheckCondtionalBlocks :: Expression -> LType -> [Block] -> String -> TypecheckerState ()
+typeCheckCondtionalBlocks :: Expression -> LType -> [Block] -> String -> TypecheckerState LType
 typeCheckCondtionalBlocks exp expectedReturnType bs errorStr = do
   eRes <- checker exp BooleanType
   curStore <- S.get
@@ -196,17 +200,24 @@ typeCheckCondtionalBlocks exp expectedReturnType bs errorStr = do
     Right True -> return $ typeCheckBlocks curStore expectedReturnType bs
     _ -> return $ Left errorStr
 
--- | Given a block, an environment, and an expected return type, check if the types are consistent in the block.
-typeCheckBlock :: Block -> LType -> TypecheckerState ()
+-- | Given a block, an environment, and an expected return type, return the type returned by the block.
+typeCheckBlock :: Block -> LType -> TypecheckerState LType
+typeCheckBlock (Block [s]) expectedReturnType = typeCheckStatement s expectedReturnType
 typeCheckBlock (Block (s : ss)) expectedReturnType = do
   curCheck <- typeCheckStatement s expectedReturnType
-  case curCheck of
-    l@(Left _) -> return l
-    Right () -> typeCheckBlock (Block ss) expectedReturnType
-typeCheckBlock (Block []) expectedReturnType = return $ Right ()
+  case (s, curCheck) of
+    (_, Left l) -> return $ Left l
+    (Return exp, Right t) -> do
+      eRes <- checker exp t
+      case eRes of
+        Left l -> return $ Left l
+        Right False -> throwError "BlockType" expectedReturnType exp
+        Right True -> return $ Right t
+    (_, Right t) -> typeCheckBlock (Block ss) expectedReturnType
+typeCheckBlock (Block []) expectedReturnType = return $ Right NilType
 
 -- | Given a statement, an environment and an expected return type, check if the types are consistent in the statement.
-typeCheckStatement :: Statement -> LType -> TypecheckerState ()
+typeCheckStatement :: Statement -> LType -> TypecheckerState LType
 typeCheckStatement (Assign (v, UnknownType) exp) expectedReturnType = do
   eTexp <- synthesis exp
   case eTexp of
@@ -215,20 +226,27 @@ typeCheckStatement (Assign (v, UnknownType) exp) expectedReturnType = do
 typeCheckStatement (Assign (v, t) exp) expectedReturnType = typeCheckAssign v t exp
 typeCheckStatement (If exp b1 b2) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b1, b2] "Non-boolean in if condition"
 typeCheckStatement (While exp b) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in while condition"
-typeCheckStatement Empty expectedReturnType = return $ Right ()
+typeCheckStatement Empty expectedReturnType = return $ Right NilType
 typeCheckStatement (Repeat b exp) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in repeat condition"
 typeCheckStatement (Return exp) expectedReturnType = do
-  eExpectedType <- synth (Name returnTypeName)
-  case eExpectedType of
+  eRes <- checker exp expectedReturnType
+  case eRes of
     Left error -> return $ Left error
-    Right expectedType -> do
-      eRes <- checker exp expectedType
-      case eRes of
-        Left error -> return $ Left error
-        Right False -> throwError "Return:" expectedType exp
-        Right True -> return $ Right ()
+    Right False -> throwError "Return" expectedReturnType exp
+    Right True -> return $ Right expectedReturnType
 
-typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState ()
+-- do
+-- eExpectedType <- synth (Name returnTypeName)
+-- case eExpectedType of
+--   Left error -> return $ Left error
+--   Right expectedType -> do
+--     eRes <- checker exp expectedType
+--     case eRes of
+--       Left error -> return $ Left error
+--       Right False -> throwError "Return:" expectedType exp
+--       Right True -> return $ Right ()
+
+typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState LType
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do
   res <- doTypeAssignment v t exp -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
@@ -237,7 +255,7 @@ typeCheckAssign v t exp = do
     (Left error, _) -> return $ Left error
     (_, Left error) -> return $ Left error
     (_, Right False) -> throwError "AssignmentError" t exp
-    (_, Right True) -> return $ Right ()
+    (_, Right True) -> return $ Right NilType
 
 doTypeAssignment :: Var -> LType -> Expression -> TypecheckerState ()
 doTypeAssignment (Name n) tExpType exp = do
@@ -282,7 +300,12 @@ updateEnv n t exp = do
       C.prepareFunctionEnv ((returnTypeName, rt) : pms)
       s <- S.get
       S.modify C.exitScope
-      return $ S.evalState (typeCheckBlock b rt) s
+      return $ case S.evalState (typeCheckBlock b rt) s of
+        Left l -> Left l
+        Right actualType ->
+          if actualType <: rt
+            then Right ()
+            else Left $ "Expected block to return type " ++ show rt ++ " got type " ++ show actualType ++ show b
     _ -> return $ Right ()
 
 checkSameType :: Expression -> Expression -> TypecheckerState Bool
@@ -332,7 +355,12 @@ typeCheckFuncBody n = do
       S.modify (`removeUncalledFunc` n)
       res <- typeCheckBlock b rt
       S.modify C.exitScope
-      return res
+      return $ case res of
+        Right t ->
+          if t <: rt
+            then return ()
+            else Left $ "Return: expected type " ++ show rt ++ " but got type " ++ show t
+        Left l -> Left l
     _ -> return $ Right ()
 
 synthesis :: Expression -> TypecheckerState LType
