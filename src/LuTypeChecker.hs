@@ -12,9 +12,6 @@ import Stack qualified
 import State (State)
 import State qualified as S
 
-returnTypeName :: Name
-returnTypeName = "@R"
-
 data TypeEnv = TypeEnv
   { uncalledFuncs :: Map Name Value,
     context :: Context LType
@@ -235,17 +232,6 @@ typeCheckStatement (Return exp) expectedReturnType = do
     Right False -> throwError "Return" expectedReturnType exp
     Right True -> return $ Right expectedReturnType
 
--- do
--- eExpectedType <- synth (Name returnTypeName)
--- case eExpectedType of
---   Left error -> return $ Left error
---   Right expectedType -> do
---     eRes <- checker exp expectedType
---     case eRes of
---       Left error -> return $ Left error
---       Right False -> throwError "Return:" expectedType exp
---       Right True -> return $ Right ()
-
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState LType
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do
@@ -297,7 +283,7 @@ updateEnv n t exp = do
     (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> do
       S.modify (addUncalledFunc (n, f))
       -- Typecheck function body with current state, but don't allow it to affect current state.
-      C.prepareFunctionEnv ((returnTypeName, rt) : pms)
+      C.prepareFunctionEnv pms
       s <- S.get
       S.modify C.exitScope
       return $ case S.evalState (typeCheckBlock b rt) s of
@@ -351,7 +337,7 @@ typeCheckFuncBody n = do
   let funcValue = getUncalledFunc s n
   case funcValue of
     Just (FunctionVal pms rt b) -> do
-      C.prepareFunctionEnv ((returnTypeName, rt) : pms)
+      C.prepareFunctionEnv pms
       S.modify (`removeUncalledFunc` n)
       res <- typeCheckBlock b rt
       S.modify C.exitScope
