@@ -158,6 +158,7 @@ test_typeCheck =
         "nameShadow" ~: testTypeCheckFile "test/lu/nameShadow.lu" True,
         "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False,
         "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" True,
+        "unionReturn2" ~: testTypeCheckFile "test/lu/unionReturn2.lu" True,
         "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False
       ]
 
