@@ -12,7 +12,7 @@ import LuSyntax
 import LuTypeChecker (TypeEnv, getUncalledFunc, runForEnv, typeCheckAST)
 import LuTypes
 import State qualified as S
-import Test.HUnit (Counts, Test (..), assert, runTestTT, (~:), (~?=))
+import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 
 class (ExtendedContext env) => TestableEnvironment env where
   execBlock :: Block -> env -> Either String env
@@ -31,8 +31,8 @@ class (ExtendedContext env) => TestableEnvironment env where
       (Left _) -> return False
       (Right s) -> return $ checkFn s
 
-  testFile :: String -> (env -> Bool) -> IO ()
-  testFile fp checkFn = assert <$> checkOutputStore fp checkFn >> return ()
+  testFile :: String -> (env -> Bool) -> IO Assertion
+  testFile fp checkFn = assert <$> checkOutputStore fp checkFn
 
 instance TestableEnvironment EvalEnv where
   execBlock :: Block -> EvalEnv -> Either String EvalEnv
@@ -42,10 +42,12 @@ instance TestableEnvironment TypeEnv where
   execBlock :: Block -> TypeEnv -> Either String TypeEnv
   execBlock = runForEnv
 
-testTypeCheckFile :: String -> Bool -> IO ()
-testTypeCheckFile fp expected = assert . (expected ==) . isLeft <$> rfs fp >> return ()
-  where
-    rfs = runFileForStore :: String -> IO (Either String TypeEnv)
+testTypeCheckFile :: String -> Bool -> IO Assertion
+testTypeCheckFile fp expected = do
+  (res :: Either String TypeEnv) <- runFileForStore fp
+  case res of
+    Left _ -> return $ assert (not expected)
+    Right _ -> return $ assert expected
 
 -- | assert that eval of file throws certain error
 checkEvalThrowsError :: String -> String -> IO ()
@@ -68,7 +70,7 @@ checkVarValueInStore targetName targetValue = checkVarProperty targetName (== ta
 
 -- | Check if variable holds any value in store.
 checkVarExistsInStore :: String -> EvalEnv -> Bool
-checkVarExistsInStore targetName = checkVarProperty targetName (const True)
+checkVarExistsInStore targetName = checkVarProperty targetName (/= NilVal)
 
 -- | Concise way to check multiple variable values.
 checkVarValuesInStore :: [(String, Value)] -> EvalEnv -> Bool
@@ -78,6 +80,13 @@ checkVarValuesInStore valuePairs env = all (\(n, v) -> checkVarValueInStore n v 
 seeTypeStore :: String -> IO ()
 seeTypeStore fp = do
   (r :: Either String TypeEnv) <- runFileForStore fp
+  case r of
+    Left l -> print l
+    Right r -> print r
+
+seeEvalStore :: String -> IO ()
+seeEvalStore fp = do
+  (r :: Either String EvalEnv) <- runFileForStore fp
   case r of
     Left l -> print l
     Right r -> print r
@@ -105,6 +114,7 @@ test_function =
         "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"),
         "function7" ~: testFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)]),
         "nameShadow" ~: testFile "test/lu/nameShadow.lu" (checkVarValuesInStore [("res", IntVal 10), ("s", StringVal "s")])
+        -- "functionFromTable" ~: testFile "test/lu/functionFromTable.lu" (checkVarValuesInStore [("result", IntVal 6)])
       ]
 
 test_typeSig :: Test
@@ -147,7 +157,7 @@ test_typeCheck =
         "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False,
         "nameShadow" ~: testTypeCheckFile "test/lu/nameShadow.lu" True,
         "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False,
-        "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" False
+        "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" True
       ]
 
 test_typeCheckStore :: Test
@@ -176,4 +186,4 @@ test_error =
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]
+test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error, test_typeCheck]

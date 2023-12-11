@@ -94,13 +94,17 @@ instance Synthable Value where
   synth (StringVal _) = return $ return StringType
   synth (TableVal n) = undefined -- what is this case?
   synth (FunctionVal pms rt b) = do
-    C.prepareFunctionEnv ((returnTypeName, rt) : pms)
-    s <- S.get
-    S.modify C.exitScope
-    case S.evalState (typeCheckBlock b) s of
-      Right () -> do
-        return $ Right $ synthFunc pms rt
-      Left l -> return $ Left l
+    return $ Right $ synthFunc pms rt
+
+  -- C.prepareFunctionEnv ((returnTypeName, rt) : pms)
+  -- let fType = synthFunc pms rt
+  -- s <- S.get
+  -- S.modify C.exitScope
+  -- -- return $ Right $ synthFunc pms rt
+  -- case S.evalState (typeCheckBlock b) s of
+  --   Right () -> do
+  --     return $ Right $ synthFunc pms rt
+  --   Left l -> return $ Left l
   synth (ErrorVal _) = return $ return NilType -- shouldn't hit this case.
 
 synthFunc :: [Parameter] -> LType -> LType
@@ -277,11 +281,15 @@ typecheckTableAccess _ _ _ = Left "Unable to access value from non-table"
 updateEnv :: Name -> LType -> Expression -> TypecheckerState ()
 updateEnv n t exp = do
   env <- S.get
-  S.modify (C.addGlobal (n, t))
+  C.update (GlobalRef n) t
   case (t, exp) of
-    (FunctionType _ _, Val f) -> do
+    (FunctionType p _, Val f@(FunctionVal pms rt b)) -> do
       S.modify (addUncalledFunc (n, f))
-      return $ Right ()
+      -- Typecheck function body with current state, but don't allow it to affect current state.
+      C.prepareFunctionEnv ((returnTypeName, rt) : pms)
+      s <- S.get
+      S.modify C.exitScope
+      return $ S.evalState (typeCheckBlock b) s
     _ -> return $ Right ()
 
 checkSameType :: Expression -> Expression -> TypecheckerState Bool
@@ -302,7 +310,9 @@ synthCall (FunctionType paramType returnType) (p : ps) = do
     (Left l) -> return $ Left l
     Right False -> throwError "ParameterAssignment" paramType p
     Right True -> synthCall nextFunction ps
-synthCall t _ = return $ Left ("CallNonFunc: Cannot call type [" ++ show t ++ "]")
+synthCall t _ = do
+  env <- S.get
+  return $ Left ("CallNonFunc: Cannot call type [" ++ show t ++ "]" ++ (show env))
 
 synthOp2 :: Bop -> Expression -> Expression -> TypecheckerState LType
 synthOp2 op e1 e2 = do
@@ -343,11 +353,11 @@ synthesis (Call (Name n) pms) = do
   case eFType of
     Left error -> return $ Left error
     Right fType -> do
-      let res = synthCall fType pms
+      res <- synthCall fType pms
       fBodyCheck <- typeCheckFuncBody n
       case fBodyCheck of
         Left error -> return $ Left error
-        Right () -> res
+        Right () -> return res
 synthesis (Op1 uop exp) = do
   eOpType <- synth uop
   case eOpType of

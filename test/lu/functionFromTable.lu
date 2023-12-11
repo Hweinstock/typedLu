@@ -1,0 +1,7 @@
+function foo(x : int ) : int 
+    return x + 1
+end 
+
+t = {}
+t["func"] = foo 
+result = t["func"](5)

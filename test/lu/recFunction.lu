@@ -1,9 +1,12 @@
+x0 = 1
+
 function factorial(x: int) : int 
+    r = 1
     if x <= 0 then 
         return 1 
     else 
         return x * factorial(x-1)
     end 
 end 
-
+y1 = 6
 z = factorial(6)
