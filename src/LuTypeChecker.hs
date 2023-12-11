@@ -95,16 +95,6 @@ instance Synthable Value where
   synth (TableVal n) = undefined -- what is this case?
   synth (FunctionVal pms rt b) = do
     return $ Right $ synthFunc pms rt
-
-  -- C.prepareFunctionEnv ((returnTypeName, rt) : pms)
-  -- let fType = synthFunc pms rt
-  -- s <- S.get
-  -- S.modify C.exitScope
-  -- -- return $ Right $ synthFunc pms rt
-  -- case S.evalState (typeCheckBlock b) s of
-  --   Right () -> do
-  --     return $ Right $ synthFunc pms rt
-  --   Left l -> return $ Left l
   synth (ErrorVal _) = return $ return NilType -- shouldn't hit this case.
 
 synthFunc :: [Parameter] -> LType -> LType
@@ -173,6 +163,7 @@ runForEnv b env = case S.runState (typeCheckBlock b) env of
 throwError :: String -> LType -> Expression -> TypecheckerState a
 throwError errorType expectedType exp = do
   eActualType <- synthesis exp
+  env <- S.get
   case eActualType of
     Left error -> return $ Left error
     Right actualType ->
@@ -186,6 +177,7 @@ throwError errorType expectedType exp = do
                \ got type ["
             ++ pretty actualType
             ++ "]"
+            ++ show env
 
 -- | typeCheck blocks individually, with some state.
 typeCheckBlocks :: TypeEnv -> [Block] -> Either String ()
@@ -239,12 +231,13 @@ typeCheckStatement (Return exp) = do
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState ()
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do
-  doTypeAssignment v t exp -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
+  res <- doTypeAssignment v t exp -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
   eSameType <- checker exp t
-  case eSameType of
-    Left error -> return $ Left error
-    Right False -> throwError "AssignmentError" t exp
-    Right True -> return $ Right ()
+  case (res, eSameType) of
+    (Left error, _) -> return $ Left error
+    (_, Left error) -> return $ Left error
+    (_, Right False) -> throwError "AssignmentError" t exp
+    (_, Right True) -> return $ Right ()
 
 doTypeAssignment :: Var -> LType -> Expression -> TypecheckerState ()
 doTypeAssignment (Name n) tExpType exp = do
@@ -283,7 +276,7 @@ updateEnv n t exp = do
   env <- S.get
   C.update (GlobalRef n) t
   case (t, exp) of
-    (FunctionType p _, Val f@(FunctionVal pms rt b)) -> do
+    (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> do
       S.modify (addUncalledFunc (n, f))
       -- Typecheck function body with current state, but don't allow it to affect current state.
       C.prepareFunctionEnv ((returnTypeName, rt) : pms)
