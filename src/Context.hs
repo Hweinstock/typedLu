@@ -9,12 +9,17 @@ import LuSyntax
 import State (State)
 import qualified State as S
 
-
 data Context a = Context {
-    gMap :: Map Name a, 
+    gMap :: Map Value a, 
     localStack :: Stack (LocalVar a),  
     curDepth :: Int
 }
+
+data Reference = 
+    GlobalRef Name -- name of global
+  | LocalRef Name  -- name of local
+  | TableRef Name Value  -- name of table, value that keys it. 
+  deriving (Eq, Show)
 
 data LocalVar a = LocalVar {
     val :: a,
@@ -22,42 +27,79 @@ data LocalVar a = LocalVar {
     depth :: Int
 }
 
-addGlobal :: (Name, a) -> Context a -> Context a
-addGlobal (k, v) c = c {gMap = Map.insert k v (gMap c)}
+class ExtendedContext ce where 
+    emptyContext :: ce 
+    exitScope :: ce -> ce 
+    enterScope :: ce -> ce 
 
-addLocal :: (Name, a) -> Context a -> Context a 
-addLocal (k, v) c = c {localStack = Stack.push (localStack c) lv} where 
-    lv = LocalVar {val = v, name = k, depth = curDepth c}
+class Environment a v where 
+    getContext :: a -> Context v 
+    setContext :: a -> Context v -> a 
 
-getGlobal :: Context a -> Name -> Maybe a 
-getGlobal c n = Map.lookup n (gMap c)
+    index :: Reference -> State a v 
 
-getLocal :: Context a -> Name -> Maybe a 
-getLocal c n = case Stack.peekUntil (localStack c) (\lv -> name lv == n) of 
-    Just lv -> Just $ val lv 
-    _ -> Nothing
+    indexTable :: (Name, Value) -> v -> State a v
 
-get :: Context a -> Name -> Maybe a 
-get c n = case (getGlobal c n, getLocal c n) of 
-    (_, Just t) -> Just t
-    (Just t, _) -> Just t 
-    _ -> Nothing
+    updateTable :: (Name, Value) -> v -> State a () 
 
--- | Decrease depth of scope and remove variables at this level. 
-exitScope :: Context a -> Context a
-exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
-    aboveDepth :: Int -> LocalVar a -> Bool 
-    aboveDepth n lv = depth lv < curDepth c
+    indexWithDefault :: Reference -> v -> State a v 
+    indexWithDefault (GlobalRef n) d = do 
+        env <- S.get 
+        return $ case getGlobal n env of 
+            Just v -> v 
+            _ -> d
+    indexWithDefault (LocalRef n) d = do 
+        env <- S.get 
+        return $ case getLocal n env of 
+            Just v -> v 
+            _ -> d 
+    indexWithDefault (TableRef tname tkey) d = indexTable (tname, tkey) d
 
--- | Increase depth of scope. 
-enterScope :: Context a -> Context a
-enterScope c = c {curDepth = curDepth c + 1}
+    update :: Reference -> v -> State a ()
+    update (GlobalRef n) v = S.modify (addGlobal (n, v)) 
+    update (LocalRef n) v = S.modify (addLocal (n, v))
+    update (TableRef n k) v = updateTable (n, k) v 
 
-setGMap :: Context a -> Map Name a -> Context a
-setGMap c m = c {gMap = m}
+    addLocal :: (Name, v) -> a -> a 
+    addLocal (n, v) env = let c = getContext env in
+                          let lv = LocalVar {val = v, name = n, depth = curDepth c} in 
+        setContext env (c {localStack = Stack.push (localStack c) lv}) 
+    
+    addGlobal :: (Name, v) -> a -> a 
+    addGlobal (k, v) env = let c = getContext env in
+        setContext env (c {gMap = Map.insert (StringVal k) v (gMap c)})
 
-emptyContext :: Context a 
-emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
+    setGMap :: Map Value v -> a -> a 
+    setGMap m env = let c = getContext env in 
+        setContext env (c {gMap = m})
+
+    getGlobal :: Name -> a -> Maybe v 
+    getGlobal n env = Map.lookup (StringVal n) ((gMap . getContext) env)
+
+    getLocal :: Name -> a -> Maybe v 
+    getLocal n env = case Stack.peekUntil ((localStack . getContext) env) (\lv -> name lv == n) of 
+        Just lv -> Just $ val lv 
+        _ -> Nothing
+
+    prepareFunctionEnv :: [(Name, v)] -> State a ()
+    prepareFunctionEnv params = do 
+        let getThisContext = getContext :: a -> Context v
+        S.modify (\env -> setContext env (enterScope (getThisContext env)))
+        S.modify (\e -> foldr addLocal e params)
+    
+instance ExtendedContext (Context a) where 
+    emptyContext :: Context a 
+    emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
+
+    -- | Decrease depth of scope and remove variables at this level. 
+    exitScope :: Context a -> Context a
+    exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1} where 
+        aboveDepth :: Int -> LocalVar a -> Bool 
+        aboveDepth n lv = depth lv < curDepth c
+
+    -- | Increase depth of scope. 
+    enterScope :: Context a -> Context a
+    enterScope c = c {curDepth = curDepth c + 1}
 
 instance Show a => Show (LocalVar a) where 
     show :: LocalVar a -> String 

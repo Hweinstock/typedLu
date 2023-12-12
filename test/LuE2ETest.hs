@@ -2,23 +2,25 @@ module LuE2ETest where
 
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=), assert)
 import LuParser (parseLuFile)
-import LuEvaluator (Store, eval, initialStore, resolveVar, index, globalTableName)
-import LuTypeChecker (typeCheckAST, runForContext, getUncalledFunc, TypeEnv, getFromEnv)
+import LuEvaluator (Store, eval, globalTableName, EvalEnv, toStore, errorCodeName, haltFlagName)
+import LuEvaluatorTest (initialEnv)
+import LuTypeChecker (typeCheckAST, runForEnv, getUncalledFunc, TypeEnv, contextLookup)
 import Context (Context) 
 import Context qualified as C
 import LuSyntax
+import LuTypes
 import State qualified as S
 import Data.Map qualified as Map
 
 -- | Parse and run file to get resulting Store (or error message)
-runFileForStore :: String -> IO (Either String Store)
+runFileForStore :: String -> IO (Either String EvalEnv)
 runFileForStore fp = do
     parseResult <- parseLuFile fp
     case parseResult of 
         (Left _) -> do 
             return $ Left "Failed to parse file"
         (Right ast) -> do 
-            let finalState = S.execState (eval ast) initialStore
+            let finalState = S.execState (eval ast) initialEnv
             return $ Right finalState
 
 -- | Parse and run typechecker on file to get resulting Store (or error message)
@@ -30,23 +32,23 @@ typeCheckFileForStore fp = do
         (Left _) -> do 
             return $ Left "Failed to parse file"
         (Right ast) -> do 
-            return $ case runForContext ast of 
+            return $ case runForEnv ast of 
                 Right s -> Right s
                 Left m -> Left m 
 
-checkVarProperty :: String -> (Value -> Bool) -> Store -> Either String Bool 
-checkVarProperty targetName property s = case Map.lookup globalTableName s of 
+checkVarProperty :: String -> (Value -> Bool) -> EvalEnv -> Either String Bool 
+checkVarProperty targetName property s = case Map.lookup globalTableName (toStore s) of 
     Nothing -> Left "Failed to find global table."
     Just globalTable -> case Map.lookup (StringVal targetName) globalTable of 
         Nothing -> Left ("Failed to find" ++ targetName ++  "variable")
         Just v -> Right $ property v
 
 -- | Check if variable holds value in store. 
-checkVarValueInStore :: String -> Value -> Store -> Either String Bool 
-checkVarValueInStore targetName targetValue = checkVarProperty targetName (== targetValue)
+checkVarValueInStore :: String -> Value -> EvalEnv -> Either String Bool 
+checkVarValueInStore targetName targetValue = checkVarProperty targetName (== targetValue) 
 
 -- | Concise way to check multiple variable values.
-checkVarValuesInStore :: [(String, Value)] -> Store -> Either String Bool 
+checkVarValuesInStore :: [(String, Value)] -> EvalEnv -> Either String Bool 
 checkVarValuesInStore valuePairs s = let results = map (\(n, v) -> checkVarValueInStore n v s) valuePairs in 
     return $ all didFail results 
     where 
@@ -55,13 +57,13 @@ checkVarValuesInStore valuePairs s = let results = map (\(n, v) -> checkVarValue
         didFail _ = False
         
 -- | Check if variable holds value in store. 
-checkVarExistsInStore :: String -> Store -> Either String Bool 
+checkVarExistsInStore :: String -> EvalEnv -> Either String Bool 
 checkVarExistsInStore targetName = checkVarProperty targetName (const True)
 
 -- | Apply target function to final store of given file. 
 -- Ex. checkFileOutputStore "test/lu/if1.lu" (checkVarValue "result" (IntVal 5)) ==> Right True
 --     since final value of "result" is (IntVal 5).    
-checkFileOutputStore :: String -> (Store -> Either String Bool) -> IO (Either String Bool)
+checkFileOutputStore :: String -> (EvalEnv -> Either String Bool) -> IO (Either String Bool)
 checkFileOutputStore fp checkFn = do 
     finalState <- runFileForStore fp 
     case finalState of 
@@ -91,7 +93,7 @@ getTypeEnvFile fp = do
     parseResult <- parseLuFile fp 
     case parseResult of 
         (Left l) -> return $ Left l
-        Right ast -> case runForContext ast of 
+        Right ast -> case runForEnv ast of 
             (Left l2) -> return $ Left l2
             Right store -> return $ Right store
 
@@ -103,7 +105,7 @@ seeTypeStore fp = do
         Right r -> putStrLn (show  r)
 
 
-testEvalFile :: String -> (Store -> Either String Bool) -> IO () 
+testEvalFile :: String -> (EvalEnv -> Either String Bool) -> IO () 
 testEvalFile fp checkFn = do 
     res <- checkFileOutputStore fp checkFn
     case res of 
@@ -140,7 +142,7 @@ test_function =
         TestList 
            [
              "function1" ~: testEvalFile "test/lu/function1.lu" (checkVarExistsInStore "foo"), 
-             "function2" ~: testEvalFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11), ("x1", NilVal), ("y1", NilVal)]), 
+             "function2" ~: testEvalFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11)]), 
              "function3" ~: testEvalFile "test/lu/function3.lu" (checkVarValuesInStore [("z", BoolVal False), ("s", StringVal "True"), ("x", IntVal 1), ("y", IntVal 2), ("result", IntVal (-1))]), 
              "function4" ~: testEvalFile "test/lu/function4.lu" (checkVarValueInStore "z" (IntVal 5)), 
              "function5" ~: testEvalFile "test/lu/function5.lu" (checkVarValuesInStore [("z", StringVal "foo"), ("x", IntVal 1)]), 
@@ -192,7 +194,8 @@ test_typeCheck =
                 "nestedFuncReturnTypeBad" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad.lu" False,
                 "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False, 
                 "nameShadow" ~: testTypeCheckFile "test/lu/nameShadow.lu" True, 
-                "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False  
+                "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False, 
+                "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" False 
 
             ]
 
@@ -202,8 +205,8 @@ test_typeCheckStore =
         TestList 
             [
                 "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (containsFunc "foo"), 
-                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (inTypeMap "z" False),
-                "calledFunc" ~: testTypeCheckFileStore "test/lu/calledFunc.lu" (inTypeMap "z" True)
+                "uncalledFunc" ~: testTypeCheckFileStore "test/lu/uncalledFunc.lu" (isNilOrUndefined "z" False),
+                "calledFunc" ~: testTypeCheckFileStore "test/lu/calledFunc.lu" (isNilOrUndefined "z" True)
 
             ] where 
                 containsFunc :: Name -> TypeEnv -> Either String Bool 
@@ -211,9 +214,10 @@ test_typeCheckStore =
                     Just _ -> return True 
                     _ -> Left "Failed to find"
 
-                inTypeMap :: Name -> Bool -> TypeEnv -> Either String Bool 
-                inTypeMap n expected env = case getFromEnv env n of 
-                    Just _ -> return expected 
+                isNilOrUndefined :: Name -> Bool -> TypeEnv -> Either String Bool 
+                isNilOrUndefined n expected env = case S.evalState (contextLookup n) env of 
+                    NilType -> return expected 
+                    UnknownType -> return expected
                     _ -> return (not expected)
 
 test_error :: Test 
@@ -221,8 +225,8 @@ test_error =
     "e2e error" ~: 
         TestList 
             [ 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal IllegalArguments)]), 
-                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), ("_H", BoolVal True), ("_E", ErrorVal DivideByZero)]) 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error1.lu" (checkVarValuesInStore [("x", IntVal 1), (haltFlagName, BoolVal True), (errorCodeName, ErrorVal IllegalArguments)]), 
+                "IllegalArguments1" ~: testEvalFile "test/lu/error2.lu" (checkVarValuesInStore [("x", IntVal 1), (haltFlagName, BoolVal True), (errorCodeName, ErrorVal DivideByZero)]) 
             ]
 test :: IO Counts 
 test = runTestTT $ TestList [test_if, test_function, test_typeSig, test_error]
