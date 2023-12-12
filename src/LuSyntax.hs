@@ -398,15 +398,24 @@ genExp m n t =
 
 -- | Generate a value
 genVal :: LType -> Gen Value
-genVal t = undefined
+genVal IntType = IntVal <$> arbitrary
+genVal StringType = StringVal <$> genStringLit
+genVal BooleanType = BoolVal <$> arbitrary
+genVal (FunctionType t1 t2) = undefined
+genVal _ = undefined -- will never reach here
 
 -- | Generate a unary operator
 genUop :: LType -> Gen Uop
-genUop t = undefined
+genUop IntType = QC.oneof [pure Neg, pure Len]
+genUop BooleanType = pure Not
+genUop _ = undefined -- will never reach here
 
 -- | Generate a binary operator
 genBop :: LType -> Gen Bop
-genBop t = undefined
+genBop IntType = QC.oneof [pure Plus, pure Minus, pure Times, pure Divide, pure Modulo]
+genBop StringType = pure Concat
+genBop BooleanType = QC.oneof [pure Eq, pure Gt, pure Ge, pure Lt, pure Le]
+genBop _ = undefined -- will never reach here
 
 -- | Generate a list of fields in a table constructor epression.
 -- We limit the size of the table to avoid size blow up.
