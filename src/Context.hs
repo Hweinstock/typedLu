@@ -45,6 +45,8 @@ class (Eq v) => Environment a v where
 
   lookup :: Name -> State a v
 
+  resolve :: Name -> State a (Reference, v)
+
   indexWithDefault :: Reference -> v -> State a v
   indexWithDefault (GlobalRef n) d = do
     env <- S.get
@@ -94,6 +96,14 @@ class (Eq v) => Environment a v where
     if localResolve == unknown
       then return globalResolve
       else return localResolve
+
+  resolveWithUnknown :: v -> Name -> State a (Reference, v)
+  resolveWithUnknown unknown n = do
+    localResolve <- index (LocalRef n) :: State a v
+    globalResolve <- index (GlobalRef n) :: State a v
+    if localResolve == unknown
+      then return (GlobalRef n, globalResolve)
+      else return (LocalRef n, localResolve)
 
   prepareFunctionEnv :: [(Name, v)] -> State a ()
   prepareFunctionEnv params = do

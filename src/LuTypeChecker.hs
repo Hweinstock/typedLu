@@ -49,6 +49,9 @@ instance Environment TypeEnv LType where
   lookup :: Name -> State TypeEnv LType
   lookup = C.lookupWithUnknown UnknownType
 
+  resolve :: Name -> State TypeEnv (Reference, LType)
+  resolve = C.resolveWithUnknown UnknownType
+
 emptyTypeEnv :: TypeEnv
 emptyTypeEnv = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
 
@@ -90,14 +93,14 @@ instance Synthable Value where
   synth (BoolVal _) = return $ return BooleanType
   synth (StringVal _) = return $ return StringType
   synth (TableVal n) = undefined -- what is this case?
+  synth (ErrorVal _) = return $ return NilType -- shouldn't hit this case.
   synth (FunctionVal pms rt b) = do
     return $ Right $ synthFunc pms rt
-  synth (ErrorVal _) = return $ return NilType -- shouldn't hit this case.
-
-synthFunc :: [Parameter] -> LType -> LType
-synthFunc [] rt = FunctionType Never rt
-synthFunc [(_, t)] rt = FunctionType t rt
-synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
+    where
+      synthFunc :: [Parameter] -> LType -> LType
+      synthFunc [] rt = FunctionType Never rt
+      synthFunc [(_, t)] rt = FunctionType t rt
+      synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
 
 instance Synthable Var where
   synth (Name n) = Right <$> C.lookup n
@@ -238,29 +241,47 @@ typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState LType
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do
   res <- doTypeAssignment v t exp -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
-  eSameType <- checker exp t
+  eSameType <- checker (Var v) t -- check that variable updates to target type.
   case (res, eSameType) of
     (Left error, _) -> return $ Left error
     (_, Left error) -> return $ Left error
     (_, Right False) -> throwError "AssignmentError" t exp
     (_, Right True) -> return $ Right NilType
 
+-- TODO: Cleanup.
 doTypeAssignment :: Var -> LType -> Expression -> TypecheckerState ()
 doTypeAssignment (Name n) tExpType exp = do
   eCurrentType <- synth (Name n)
   case eCurrentType of
     Left l -> return $ Left l
     Right NilType -> updateEnv n tExpType exp
-    Right UnknownType -> return $ Left "Unable to determine type of expression in assignment"
     Right curType ->
       if curType /= tExpType
         then return $ Left "Cannot redefine variable to new type"
         else updateEnv n tExpType exp
+doTypeAssignment (Dot e@(Var (Name tableName)) n) vExpType exp = do
+  eTExpType <- synthesis e
+  case eTExpType of
+    Left l -> return $ Left l
+    Right tExpType -> do
+      case typecheckTableAccess tExpType StringType vExpType of
+        Left l -> return $ Left l
+        Right l -> updateTableType tableName tExpType StringType vExpType
 doTypeAssignment (Dot tExp n) vExpType _ = do
   eTExpType <- synthesis tExp
   return $ case eTExpType of
     Left l -> Left l
     Right tExpType -> typecheckTableAccess tExpType StringType vExpType
+doTypeAssignment (Proj e@(Var (Name tableName)) kExp) vExpType exp = do
+  eKExpType <- synthesis kExp
+  eTExpType <- synthesis e
+  case (eTExpType, eKExpType) of
+    (Left l, _) -> return $ Left l
+    (_, Left l) -> return $ Left l
+    (Right tExpType, Right kExpType) -> do
+      case typecheckTableAccess tExpType kExpType vExpType of
+        Left l -> return $ Left l
+        Right l -> updateTableType tableName tExpType kExpType vExpType
 doTypeAssignment (Proj tExp kExp) vExpType _ = do
   eKExpType <- synthesis kExp
   eTExpType <- synthesis tExp
@@ -269,6 +290,7 @@ doTypeAssignment (Proj tExp kExp) vExpType _ = do
     (Left l, _) -> Left l
     (_, Left l) -> Left l
 
+-- | Check if accessing key with given type and expecting given type is valid for given table.
 typecheckTableAccess :: LType -> LType -> LType -> Either String ()
 typecheckTableAccess (TableType kType vType) givenKType givenVType =
   if givenKType <: kType && givenVType <: vType
@@ -295,6 +317,15 @@ updateEnv n t exp = do
             then Right ()
             else Left $ "Expected block to return type " ++ show rt ++ " got type " ++ show actualType ++ show b
     _ -> return $ Right ()
+
+updateTableType :: Name -> LType -> LType -> LType -> TypecheckerState ()
+updateTableType tableName (TableType kTypeOld vTypeOld) kTypeNew vTypeNew = do
+  let kType = constructUnionType [kTypeOld, kTypeNew]
+  let vType = constructUnionType [vTypeOld, vTypeNew]
+  (ref, _ :: LType) <- C.resolve tableName
+  C.update ref (TableType kType vType)
+  return $ Right ()
+updateTableType _ _ _ _ = return $ Left "Cannot update non table."
 
 checkSameType :: Expression -> Expression -> TypecheckerState Bool
 checkSameType e1 e2 = do

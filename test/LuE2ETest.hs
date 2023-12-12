@@ -163,7 +163,9 @@ test_typeCheck =
         "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" True,
         "unionReturn2" ~: testTypeCheckFile "test/lu/unionReturn2.lu" True,
         "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False,
-        "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True
+        "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True,
+        "redefine" ~: testTypeCheckFile "test/lu/redefine.lu" False,
+        "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True
       ]
 
 test_typeCheckStore :: Test
