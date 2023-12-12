@@ -12,8 +12,6 @@ import Data.Map qualified as Map
 import LuSyntax
 import LuTypes
 import Stack qualified
-import State (State)
-import State qualified as S
 
 data TypeEnv = TypeEnv
   { uncalledFuncs :: Map Reference Value,

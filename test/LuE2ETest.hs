@@ -12,7 +12,6 @@ import LuParser (parseLuFile)
 import LuSyntax
 import LuTypeChecker (TypeEnv, execEnv, getUncalledFunc, typeCheckAST)
 import LuTypes
-import State qualified as S
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 
 class (ExtendedContext env) => TestableEnvironment env where

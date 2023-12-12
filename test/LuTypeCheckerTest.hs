@@ -6,7 +6,6 @@ import LuEvaluator (Store)
 import LuSyntax
 import LuTypeChecker
 import LuTypes
-import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 

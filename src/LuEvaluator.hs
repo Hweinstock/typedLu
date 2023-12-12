@@ -11,8 +11,6 @@ import Data.Map qualified as Map
 import LuParser qualified
 import LuSyntax
 import LuTypes
-import State (State)
-import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 

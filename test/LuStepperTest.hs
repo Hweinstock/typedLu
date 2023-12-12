@@ -7,8 +7,6 @@ import LuEvaluator (EvalEnv, Store, execWithoutError, fromStore, globalTableName
 import LuEvaluatorTest (extendedEnv, initialEnv)
 import LuStepper
 import LuSyntax
-import State (State)
-import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 

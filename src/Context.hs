@@ -8,8 +8,6 @@ import LuSyntax
 import LuTypes
 import Stack (Stack)
 import Stack qualified
-import State (State)
-import State qualified as S
 
 data Context a = Context
   { gMap :: Map Value a,

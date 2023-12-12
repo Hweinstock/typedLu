@@ -7,7 +7,6 @@ import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import LuEvaluator
 import LuSyntax
-import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 

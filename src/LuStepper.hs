@@ -10,8 +10,6 @@ import Data.Maybe (fromMaybe)
 import LuEvaluator
 import LuParser qualified
 import LuSyntax
-import State (State)
-import State qualified as S
 import System.IO
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
