@@ -141,6 +141,43 @@ instance Synthable [TableField] where
           (_, Left l, _) -> return $ Left l
           (_, _, Left l) -> return $ Left l
 
+instance Synthable (Statement, LType) where
+  -- \| Given a statement, an environment and an expected return type, check if the types are consistent in the statement.
+  synth :: (Statement, LType) -> TypecheckerState LType
+  synth (Assign (v, UnknownType) exp, expectedReturnType) = do
+    eTexp <- synthesis exp
+    case eTexp of
+      Right t -> typeCheckAssign v t exp
+      Left l -> return $ Left l
+  synth (Assign (v, t) exp, expectedReturnType) = typeCheckAssign v t exp
+  synth (If exp b1 b2, expectedReturnType) = typeCheckCondtionalBlocks exp expectedReturnType [b1, b2] "Non-boolean in if condition"
+  synth (While exp b, expectedReturnType) = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in while condition"
+  synth (Empty, expectedReturnType) = return $ Right NilType
+  synth (Repeat b exp, expectedReturnType) = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in repeat condition"
+  synth (Return exp, expectedReturnType) = do
+    eRes <- checker exp expectedReturnType
+    case eRes of
+      Left error -> return $ Left error
+      Right False -> throwError "Return" expectedReturnType exp
+      Right True -> return $ Right expectedReturnType
+
+instance Synthable (Block, LType) where
+  -- \| Given a block, an environment, and an expected return type, return the type returned by the block.
+  synth :: (Block, LType) -> TypecheckerState LType
+  synth (Block [s], expectedReturnType) = synth (s, expectedReturnType)
+  synth (Block (s : ss), expectedReturnType) = do
+    curCheck <- synth (s, expectedReturnType)
+    case (s, curCheck) of
+      (_, Left l) -> return $ Left l
+      (Return exp, Right t) -> do
+        eRes <- checker exp t
+        case eRes of
+          Left l -> return $ Left l
+          Right False -> throwError "BlockType" expectedReturnType exp
+          Right True -> return $ Right t
+      (_, Right t) -> synth (Block ss, expectedReturnType)
+  synth (Block [], expectedReturnType) = return $ Right NilType
+
 isPolymorphicBop :: Bop -> Bool
 isPolymorphicBop Eq = True
 isPolymorphicBop Gt = True
@@ -150,12 +187,12 @@ isPolymorphicBop Le = True
 isPolymorphicBop _ = False
 
 typeCheckAST :: Block -> TypeEnv -> Either String ()
-typeCheckAST b env = case S.evalState (typeCheckBlock b Never) env of
+typeCheckAST b env = case S.evalState (synth (b, Never)) env of
   Right t -> Right ()
   Left l -> Left l
 
 runForEnv :: Block -> TypeEnv -> Either String TypeEnv
-runForEnv b env = case S.runState (typeCheckBlock b Never) env of
+runForEnv b env = case S.runState (synth (b, Never)) env of
   (Right t, finalStore) -> Right finalStore
   (Left l, finalStore) -> Left l
 
@@ -184,7 +221,7 @@ typeCheckBlocks env expectedReturnType = foldr checkBlock (Right Never)
   where
     checkBlock :: Block -> Either String LType -> Either String LType
     checkBlock b l@(Left _) = l
-    checkBlock b (Right prevT) = case S.evalState (typeCheckBlock b expectedReturnType) env of
+    checkBlock b (Right prevT) = case S.evalState (synth (b, expectedReturnType)) env of
       l@(Left _) -> l
       Right nextT -> Right $ constructUnionType [prevT, nextT]
 
@@ -196,41 +233,6 @@ typeCheckCondtionalBlocks exp expectedReturnType bs errorStr = do
   case eRes of
     Right True -> return $ typeCheckBlocks curStore expectedReturnType bs
     _ -> return $ Left errorStr
-
--- | Given a block, an environment, and an expected return type, return the type returned by the block.
-typeCheckBlock :: Block -> LType -> TypecheckerState LType
-typeCheckBlock (Block [s]) expectedReturnType = typeCheckStatement s expectedReturnType
-typeCheckBlock (Block (s : ss)) expectedReturnType = do
-  curCheck <- typeCheckStatement s expectedReturnType
-  case (s, curCheck) of
-    (_, Left l) -> return $ Left l
-    (Return exp, Right t) -> do
-      eRes <- checker exp t
-      case eRes of
-        Left l -> return $ Left l
-        Right False -> throwError "BlockType" expectedReturnType exp
-        Right True -> return $ Right t
-    (_, Right t) -> typeCheckBlock (Block ss) expectedReturnType
-typeCheckBlock (Block []) expectedReturnType = return $ Right NilType
-
--- | Given a statement, an environment and an expected return type, check if the types are consistent in the statement.
-typeCheckStatement :: Statement -> LType -> TypecheckerState LType
-typeCheckStatement (Assign (v, UnknownType) exp) expectedReturnType = do
-  eTexp <- synthesis exp
-  case eTexp of
-    Right t -> typeCheckAssign v t exp
-    Left l -> return $ Left l
-typeCheckStatement (Assign (v, t) exp) expectedReturnType = typeCheckAssign v t exp
-typeCheckStatement (If exp b1 b2) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b1, b2] "Non-boolean in if condition"
-typeCheckStatement (While exp b) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in while condition"
-typeCheckStatement Empty expectedReturnType = return $ Right NilType
-typeCheckStatement (Repeat b exp) expectedReturnType = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in repeat condition"
-typeCheckStatement (Return exp) expectedReturnType = do
-  eRes <- checker exp expectedReturnType
-  case eRes of
-    Left error -> return $ Left error
-    Right False -> throwError "Return" expectedReturnType exp
-    Right True -> return $ Right expectedReturnType
 
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState LType
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
@@ -286,7 +288,7 @@ updateEnv n t exp = do
       C.prepareFunctionEnv pms
       s <- S.get
       S.modify C.exitScope
-      return $ case S.evalState (typeCheckBlock b rt) s of
+      return $ case S.evalState (synth (b, rt)) s of
         Left l -> Left l
         Right actualType ->
           if actualType <: rt
@@ -339,7 +341,7 @@ typeCheckFuncBody n = do
     Just (FunctionVal pms rt b) -> do
       C.prepareFunctionEnv pms
       S.modify (`removeUncalledFunc` n)
-      res <- typeCheckBlock b rt
+      res <- synth (b, rt)
       S.modify C.exitScope
       return $ case res of
         Right t ->

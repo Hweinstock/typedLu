@@ -284,17 +284,17 @@ test_typeCheckStatement :: Test
 test_typeCheckStatement =
   "typechecking statement" ~:
     TestList
-      [ S.evalState (typeCheckStatement (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) Never) emptyTypeEnv ~?= Right NilType,
-        S.evalState (typeCheckStatement (Return (Val (StringVal "foo"))) StringType) emptyTypeEnv ~?= Right StringType,
-        S.evalState (typeCheckStatement (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])) StringType) emptyTypeEnv ~?= Right StringType
+      [ S.evalState (synth (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))]))), Never)) emptyTypeEnv ~?= Right NilType,
+        S.evalState (synth (Return (Val (StringVal "foo")), StringType)) emptyTypeEnv ~?= Right StringType,
+        S.evalState (synth (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))]), StringType)) emptyTypeEnv ~?= Right StringType
       ]
 
 test_typeCheckBlock :: Test
 test_typeCheckBlock =
   "typechecking block" ~:
     TestList
-      [ S.evalState (typeCheckBlock (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])]) StringType) emptyTypeEnv ~?= Right StringType,
-        S.evalState (typeCheckBlock (Block [Return (Val (StringVal "foo"))]) StringType) emptyTypeEnv ~?= Right StringType
+      [ S.evalState (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])], StringType)) emptyTypeEnv ~?= Right StringType,
+        S.evalState (synth (Block [Return (Val (StringVal "foo"))], StringType)) emptyTypeEnv ~?= Right StringType
       ]
 
 test_typeCheckBlocks :: Test
