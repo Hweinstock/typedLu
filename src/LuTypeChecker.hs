@@ -158,10 +158,10 @@ instance Synthable (Statement, LType) where
       Right t -> typeCheckAssign v t exp
       Left l -> return $ Left l
   synth (Assign (v, t) exp, expectedReturnType) = typeCheckAssign v t exp
-  synth (If exp b1 b2, expectedReturnType) = typeCheckCondtionalBlocks exp expectedReturnType [b1, b2] "Non-boolean in if condition"
-  synth (While exp b, expectedReturnType) = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in while condition"
+  synth (If exp b1 b2, expectedReturnType) = typeCheckConditionalBlocks exp expectedReturnType [b1, b2] "Non-boolean in if condition"
+  synth (While exp b, expectedReturnType) = typeCheckConditionalBlocks exp expectedReturnType [b] "Non-boolean in while condition"
   synth (Empty, expectedReturnType) = return $ Right NilType
-  synth (Repeat b exp, expectedReturnType) = typeCheckCondtionalBlocks exp expectedReturnType [b] "Non-boolean in repeat condition"
+  synth (Repeat b exp, expectedReturnType) = typeCheckConditionalBlocks exp expectedReturnType [b] "Non-boolean in repeat condition"
   synth (Return exp, expectedReturnType) = do
     eRes <- checker exp expectedReturnType
     case eRes of
@@ -186,11 +186,13 @@ instance Synthable (Block, LType) where
       (_, Right t) -> synth (Block ss, expectedReturnType)
   synth (Block [], expectedReturnType) = return $ Right NilType
 
+-- Given AST and env, typechecks it.
 typeCheckAST :: Block -> TypeEnv -> Either String ()
 typeCheckAST b env = case S.evalState (synth (b, Never)) env of
   Right t -> Right ()
   Left l -> Left l
 
+-- Given AST and env, typechecks it, returning resulting store.
 runForEnv :: Block -> TypeEnv -> Either String TypeEnv
 runForEnv b env = case S.runState (synth (b, Never)) env of
   (Right t, finalStore) -> Right finalStore
@@ -226,8 +228,8 @@ typeCheckBlocks env expectedReturnType = foldr checkBlock (Right Never)
       Right nextT -> Right $ constructUnionType [prevT, nextT]
 
 -- | Check that given expression is boolean, then check underlying blocks.
-typeCheckCondtionalBlocks :: Expression -> LType -> [Block] -> String -> TypecheckerState LType
-typeCheckCondtionalBlocks exp expectedReturnType bs errorStr = do
+typeCheckConditionalBlocks :: Expression -> LType -> [Block] -> String -> TypecheckerState LType
+typeCheckConditionalBlocks exp expectedReturnType bs errorStr = do
   eRes <- checker exp BooleanType
   curStore <- S.get
   case eRes of

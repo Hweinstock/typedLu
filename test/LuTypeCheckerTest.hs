@@ -294,18 +294,43 @@ test_typeCheckBlock =
   "typechecking block" ~:
     TestList
       [ S.evalState (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])], StringType)) emptyTypeEnv ~?= Right StringType,
-        S.evalState (synth (Block [Return (Val (StringVal "foo"))], StringType)) emptyTypeEnv ~?= Right StringType
+        S.evalState (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])], (UnionType StringType IntType))) emptyTypeEnv ~?= Right (UnionType StringType IntType),
+        S.evalState (synth (Block [Return (Val (StringVal "foo"))], StringType)) emptyTypeEnv ~?= Right StringType,
+        S.evalState (synth (Block [Return (Val (IntVal 5))], IntType)) emptyTypeEnv ~?= Right IntType,
+        S.evalState (synth (Block [], NilType)) emptyTypeEnv ~?= Right NilType
       ]
 
 test_typeCheckBlocks :: Test
 test_typeCheckBlocks =
   "typehecking multiple Blocks" ~:
     TestList
-      [ typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (StringVal "foo"))], Block [Return (Val (StringVal "not foo"))]] ~?= Right StringType
+      [ typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (StringVal "foo"))], Block [Return (Val (StringVal "not foo"))]] ~?= Right StringType,
+        typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (IntVal 5))], Block [Return (Val (StringVal "not foo"))]] ~?= Right (UnionType StringType IntType),
+        typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (IntVal 5))], Block []] ~?= Right (UnionType StringType NilType)
+      ]
+
+test_typeCheckConditionalBlocks :: Test
+test_typeCheckConditionalBlocks =
+  "typehecking conditional Blocks" ~:
+    TestList
+      [ S.evalState (typeCheckConditionalBlocks (Val (BoolVal True)) StringType [Block [Return (Val (StringVal "here"))]] "error") C.emptyContext ~?= Right StringType,
+        S.evalState (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType StringType IntType) [Block [Return (Val (StringVal "here")), Return (Val (IntVal 5))]] "error") C.emptyContext ~?= Right (UnionType StringType IntType),
+        S.evalState (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType NilType IntType) [Block [Return (Val NilVal), Empty]] "error") C.emptyContext ~?= Right (UnionType NilType IntType)
+      ]
+
+test_uncalledFunc :: Test
+test_uncalledFunc =
+  "tracking uncalled funcs" ~:
+    TestList
+      [ -- Adding func to map should make it accessible.
+        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyContext) (C.GlobalRef "foo") ~?= Just (FunctionVal [] NilType (Block [])),
+        -- only get func that matches name.
+        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo2") (FunctionVal [] NilType (Block [])) C.emptyContext) (C.GlobalRef "foo") ~?= Nothing,
+        getUncalledFunc (removeUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyContext) (C.GlobalRef "foo")) (C.GlobalRef "foo") ~?= Nothing
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_typeCheckBlock, test_typeCheckStatement, test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
+test = runTestTT $ TestList [test_typeCheckConditionalBlocks, test_uncalledFunc, test_typeCheckBlock, test_typeCheckStatement, test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
 
 {-
 ===================================================================
