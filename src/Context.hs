@@ -19,7 +19,7 @@ data Reference
   = GlobalRef Name -- name of global
   | LocalRef Name -- name of local
   | TableRef Name Value -- name of table, value that keys it.
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data LocalVar a = LocalVar
   { val :: a,

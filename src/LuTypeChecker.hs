@@ -13,7 +13,7 @@ import State (State)
 import State qualified as S
 
 data TypeEnv = TypeEnv
-  { uncalledFuncs :: Map Name Value,
+  { uncalledFuncs :: Map Reference Value,
     context :: Context LType
   }
   deriving (Show)
@@ -55,13 +55,13 @@ instance Environment TypeEnv LType where
 emptyTypeEnv :: TypeEnv
 emptyTypeEnv = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
 
-addUncalledFunc :: (Name, Value) -> TypeEnv -> TypeEnv
-addUncalledFunc (k, v) env = env {uncalledFuncs = Map.insert k v (uncalledFuncs env)}
+addUncalledFunc :: Reference -> Value -> TypeEnv -> TypeEnv
+addUncalledFunc ref v env = env {uncalledFuncs = Map.insert ref v (uncalledFuncs env)}
 
-getUncalledFunc :: TypeEnv -> Name -> Maybe Value
+getUncalledFunc :: TypeEnv -> Reference -> Maybe Value
 getUncalledFunc env n = Map.lookup n (uncalledFuncs env)
 
-removeUncalledFunc :: TypeEnv -> Name -> TypeEnv
+removeUncalledFunc :: TypeEnv -> Reference -> TypeEnv
 removeUncalledFunc env n = env {uncalledFuncs = Map.delete n (uncalledFuncs env)}
 
 type TypecheckerState a = State TypeEnv (Either String a)
@@ -251,14 +251,10 @@ typeCheckAssign v t exp = do
 -- TODO: Cleanup.
 doTypeAssignment :: Var -> LType -> Expression -> TypecheckerState ()
 doTypeAssignment (Name n) tExpType exp = do
-  eCurrentType <- synth (Name n)
-  case eCurrentType of
-    Left l -> return $ Left l
-    Right NilType -> updateEnv n tExpType exp
-    Right curType ->
-      if curType /= tExpType
-        then return $ Left "Cannot redefine variable to new type"
-        else updateEnv n tExpType exp
+  (ref, curType :: LType) <- C.resolve n
+  if curType == NilType || curType == tExpType
+    then updateEnv ref tExpType exp
+    else return $ Left "Cannot redefine variable to new type"
 doTypeAssignment (Dot e@(Var (Name tableName)) n) vExpType exp = do
   eTExpType <- synthesis e
   case eTExpType of
@@ -299,24 +295,27 @@ typecheckTableAccess (TableType kType vType) givenKType givenVType =
 typecheckTableAccess _ _ _ = Left "Unable to access value from non-table"
 
 -- | Update variable type in store.
-updateEnv :: Name -> LType -> Expression -> TypecheckerState ()
-updateEnv n t exp = do
-  env <- S.get
-  C.update (GlobalRef n) t
+updateEnv :: Reference -> LType -> Expression -> TypecheckerState ()
+updateEnv ref t exp = do
+  C.update ref t
   case (t, exp) of
-    (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> do
-      S.modify (addUncalledFunc (n, f))
-      -- Typecheck function body with current state, but don't allow it to affect current state.
-      C.prepareFunctionEnv pms
-      s <- S.get
-      S.modify C.exitScope
-      return $ case S.evalState (synth (b, rt)) s of
-        Left l -> Left l
-        Right actualType ->
-          if actualType <: rt
-            then Right ()
-            else Left $ "Expected block to return type " ++ show rt ++ " got type " ++ show actualType ++ show b
+    (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> preCheckFuncBody ref pms rt b
     _ -> return $ Right ()
+
+-- | Typecheck function body with current state, but don't allow it to affect current state.
+preCheckFuncBody :: Reference -> [Parameter] -> LType -> Block -> TypecheckerState ()
+preCheckFuncBody ref pms rt b = do
+  S.modify (addUncalledFunc ref (FunctionVal pms rt b))
+  C.prepareFunctionEnv pms
+  s <- S.get
+  S.modify C.exitScope
+  let blockType = S.evalState (synth (b, rt)) s
+  return $ case blockType of
+    Left l -> Left l
+    Right actualType ->
+      if actualType <: rt
+        then Right ()
+        else Left $ "Expected block to return type " ++ show rt ++ " got type " ++ show actualType ++ " in body " ++ show b
 
 updateTableType :: Name -> LType -> LType -> LType -> TypecheckerState ()
 updateTableType tableName (TableType kTypeOld vTypeOld) kTypeNew vTypeNew = do
@@ -364,14 +363,14 @@ synthOp2Poly op e1 e2 = do
     (Left error) -> return $ Left error
     Right True -> synthOp2 op e1 e2
 
-typeCheckFuncBody :: Name -> TypecheckerState ()
-typeCheckFuncBody n = do
+typeCheckFuncBody :: Reference -> TypecheckerState ()
+typeCheckFuncBody ref = do
   s <- S.get
-  let funcValue = getUncalledFunc s n
+  let funcValue = getUncalledFunc s ref
   case funcValue of
     Just (FunctionVal pms rt b) -> do
       C.prepareFunctionEnv pms
-      S.modify (`removeUncalledFunc` n)
+      S.modify (`removeUncalledFunc` ref)
       res <- synth (b, rt)
       S.modify C.exitScope
       return $ case res of
@@ -389,15 +388,12 @@ synthesis (Val v) = synth v
 synthesis (Var v) = synth v
 synthesis (TableConst tfs) = synth tfs
 synthesis (Call (Name n) pms) = do
-  eFType <- synth (Name n)
-  case eFType of
+  (ref, fType :: LType) <- C.resolve n
+  res <- synthCall fType pms
+  fBodyCheck <- typeCheckFuncBody ref
+  case fBodyCheck of
     Left error -> return $ Left error
-    Right fType -> do
-      res <- synthCall fType pms
-      fBodyCheck <- typeCheckFuncBody n
-      case fBodyCheck of
-        Left error -> return $ Left error
-        Right () -> return res
+    Right () -> return res
 synthesis (Op1 uop exp) = do
   eOpType <- synth uop
   case eOpType of

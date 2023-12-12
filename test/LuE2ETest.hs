@@ -1,6 +1,6 @@
 module LuE2ETest where
 
-import Context (Context, ExtendedContext)
+import Context (Context, ExtendedContext, Reference (GlobalRef))
 import Context qualified as C
 import Data.Either (isLeft)
 import Data.Map qualified as Map
@@ -178,7 +178,7 @@ test_typeCheckStore =
       ]
   where
     containsFunc :: Name -> TypeEnv -> Bool
-    containsFunc n env = isJust $ getUncalledFunc env n
+    containsFunc n env = isJust $ getUncalledFunc env (GlobalRef n)
 
     isNilOrUndefined :: Name -> Bool -> TypeEnv -> Bool
     isNilOrUndefined n expected env = expected == (actual == NilType || actual == UnknownType)
