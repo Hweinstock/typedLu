@@ -101,7 +101,7 @@ test_if =
 
 test_function :: Test
 test_function =
-  "e2e function" ~:
+  "eval function" ~:
     TestList
       [ "function1" ~: testFile "test/lu/function1.lu" (checkVarExistsInStore "foo"),
         "function2" ~: testFile "test/lu/function2.lu" (checkVarValuesInStore [("z", IntVal 11)]),
@@ -110,10 +110,12 @@ test_function =
         "function5" ~: testFile "test/lu/function5.lu" (checkVarValuesInStore [("z", StringVal "foo"), ("x", IntVal 1)]),
         "function6" ~: testFile "test/lu/function6.lu" (checkVarValuesInStore [("f", BoolVal False), ("z", IntVal 1)]),
         "recFunction" ~: testFile "test/lu/recFunction.lu" (checkVarValueInStore "z" (IntVal 720)),
+        "recFunction2" ~: testFile "test/lu/recFunction2.lu" (checkVarValuesInStore [("result", IntVal 55)]),
         "weirdScopesFunc" ~: testFile "test/lu/weirdScopesFunc.lu" (checkVarValuesInStore [("result", IntVal 18), ("result2", IntVal 12)]),
         "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"),
         "function7" ~: testFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)]),
-        "nameShadow" ~: testFile "test/lu/nameShadow.lu" (checkVarValuesInStore [("res", IntVal 10), ("s", StringVal "s")])
+        "nameShadow" ~: testFile "test/lu/nameShadow.lu" (checkVarValuesInStore [("res", IntVal 10), ("s", StringVal "s")]),
+        "mutualRecFunction" ~: testFile "test/lu/mutualRecFunc.lu" (checkVarValuesInStore [("result", BoolVal True), ("result2", BoolVal True)])
         -- "functionFromTable" ~: testFile "test/lu/functionFromTable.lu" (checkVarValuesInStore [("result", IntVal 6)])
       ]
 
@@ -140,6 +142,7 @@ test_typeCheck =
         "optionalSig1" ~: testTypeCheckFile "test/lu/optionalSig1.lu" True,
         "optionalSig2" ~: testTypeCheckFile "test/lu/optionalSig2.lu" True,
         "recFunction" ~: testTypeCheckFile "test/lu/recFunction.lu" True,
+        "recFunction2" ~: testTypeCheckFile "test/lu/recFunction2.lu" True,
         "function1" ~: testTypeCheckFile "test/lu/function1.lu" True,
         "function2" ~: testTypeCheckFile "test/lu/function2.lu" True,
         "function3" ~: testTypeCheckFile "test/lu/function3.lu" True,
@@ -159,7 +162,8 @@ test_typeCheck =
         "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False,
         "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" True,
         "unionReturn2" ~: testTypeCheckFile "test/lu/unionReturn2.lu" True,
-        "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False
+        "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False,
+        "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True
       ]
 
 test_typeCheckStore :: Test

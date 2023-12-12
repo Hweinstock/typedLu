@@ -1,0 +1,18 @@
+function isEven(x : int) : boolean
+    function isOdd(x: int) : boolean
+        if x == 1 then 
+            return true 
+        else 
+            return isEven(x-1)
+        end 
+    end 
+
+    if x == 0 then 
+        return true 
+    else 
+        return isOdd(x-1)
+    end 
+end 
+
+result2 = isEven(12)
+result = isOdd(11)
