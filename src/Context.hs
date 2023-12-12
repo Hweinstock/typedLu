@@ -43,9 +43,7 @@ class (Eq v) => Environment a v where
 
   updateTable :: (Name, Value) -> v -> State a ()
 
-  lookup :: Name -> State a v
-
-  resolve :: Name -> State a (Reference, v)
+  resolveName :: Name -> State a (Reference, v)
 
   indexWithDefault :: Reference -> v -> State a v
   indexWithDefault (GlobalRef n) d = do
@@ -65,21 +63,18 @@ class (Eq v) => Environment a v where
   update (LocalRef n) v = S.modify (addLocal (n, v))
   update (TableRef n k) v = updateTable (n, k) v
 
+  -- Internal method.
   addLocal :: (Name, v) -> a -> a
   addLocal (n, v) env =
     let c = getContext env
      in let lv = LocalVar {val = v, name = n, depth = curDepth c}
          in setContext env (c {localStack = Stack.push (localStack c) lv})
 
+  -- Internal method.
   addGlobal :: (Name, v) -> a -> a
   addGlobal (k, v) env =
     let c = getContext env
      in setContext env (c {gMap = Map.insert (StringVal k) v (gMap c)})
-
-  setGMap :: Map Value v -> a -> a
-  setGMap m env =
-    let c = getContext env
-     in setContext env (c {gMap = m})
 
   getGlobal :: Name -> a -> Maybe v
   getGlobal n env = Map.lookup (StringVal n) ((gMap . getContext) env)
@@ -89,16 +84,14 @@ class (Eq v) => Environment a v where
     Just lv -> Just $ val lv
     _ -> Nothing
 
-  lookupWithUnknown :: v -> Name -> State a v
-  lookupWithUnknown unknown n = do
-    localResolve <- index (LocalRef n)
-    globalResolve <- index (GlobalRef n)
-    if localResolve == unknown
-      then return globalResolve
-      else return localResolve
+  -- Set global map, useful for testing and initialization.
+  setGMap :: Map Value v -> a -> a
+  setGMap m env =
+    let c = getContext env
+     in setContext env (c {gMap = m})
 
-  resolveWithUnknown :: v -> Name -> State a (Reference, v)
-  resolveWithUnknown unknown n = do
+  resolveNameWithUnknown :: v -> Name -> State a (Reference, v)
+  resolveNameWithUnknown unknown n = do
     localResolve <- index (LocalRef n) :: State a v
     globalResolve <- index (GlobalRef n) :: State a v
     if localResolve == unknown

@@ -46,11 +46,8 @@ instance Environment TypeEnv LType where
   updateTable :: (Name, Value) -> LType -> State TypeEnv ()
   updateTable _ _ = return ()
 
-  lookup :: Name -> State TypeEnv LType
-  lookup = C.lookupWithUnknown UnknownType
-
-  resolve :: Name -> State TypeEnv (Reference, LType)
-  resolve = C.resolveWithUnknown UnknownType
+  resolveName :: Name -> State TypeEnv (Reference, LType)
+  resolveName = C.resolveNameWithUnknown UnknownType
 
 emptyTypeEnv :: TypeEnv
 emptyTypeEnv = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
@@ -63,6 +60,14 @@ getUncalledFunc env n = Map.lookup n (uncalledFuncs env)
 
 removeUncalledFunc :: TypeEnv -> Reference -> TypeEnv
 removeUncalledFunc env n = env {uncalledFuncs = Map.delete n (uncalledFuncs env)}
+
+-- | Update variable type in store. Handles case where we need to add function to uncalled map.
+updateRef :: Reference -> LType -> Expression -> TypecheckerState ()
+updateRef ref t exp = do
+  C.update ref t
+  case (t, exp) of
+    (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> preCheckFuncBody ref pms rt b
+    _ -> return $ Right ()
 
 type TypecheckerState a = State TypeEnv (Either String a)
 
@@ -103,7 +108,7 @@ instance Synthable Value where
       synthFunc ((_, t) : ps) rt = FunctionType t (synthFunc ps rt)
 
 instance Synthable Var where
-  synth (Name n) = Right <$> C.lookup n
+  synth (Name n) = Right . snd <$> C.resolveName n
   synth (Dot exp n) = do
     eExpType <- synthesis exp
     return $ case eExpType of
@@ -181,14 +186,6 @@ instance Synthable (Block, LType) where
       (_, Right t) -> synth (Block ss, expectedReturnType)
   synth (Block [], expectedReturnType) = return $ Right NilType
 
-isPolymorphicBop :: Bop -> Bool
-isPolymorphicBop Eq = True
-isPolymorphicBop Gt = True
-isPolymorphicBop Ge = True
-isPolymorphicBop Lt = True
-isPolymorphicBop Le = True
-isPolymorphicBop _ = False
-
 typeCheckAST :: Block -> TypeEnv -> Either String ()
 typeCheckAST b env = case S.evalState (synth (b, Never)) env of
   Right t -> Right ()
@@ -240,51 +237,40 @@ typeCheckCondtionalBlocks exp expectedReturnType bs errorStr = do
 typeCheckAssign :: Var -> LType -> Expression -> TypecheckerState LType
 typeCheckAssign v UnknownType exp = return $ Left ("Can not determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do
-  res <- doTypeAssignment v t exp -- Try to do type assignment, then evaluate expression type. (Recursive definitions)
-  eSameType <- checker (Var v) t -- check that variable updates to target type.
+  res <- doTypeAssignment v t exp -- Do type assignment first, in case definition is recursive.
+  eSameType <- checker (Var v) t -- Check that variable updates to target type in case table key/value type changes.
   case (res, eSameType) of
     (Left error, _) -> return $ Left error
     (_, Left error) -> return $ Left error
     (_, Right False) -> throwError "AssignmentError" t exp
     (_, Right True) -> return $ Right NilType
 
--- TODO: Cleanup.
+-- Given var, its determined type, and
 doTypeAssignment :: Var -> LType -> Expression -> TypecheckerState ()
 doTypeAssignment (Name n) tExpType exp = do
-  (ref, curType :: LType) <- C.resolve n
+  (ref, curType :: LType) <- C.resolveName n
   if curType == NilType || curType == tExpType
-    then updateEnv ref tExpType exp
+    then updateRef ref tExpType exp
     else return $ Left "Cannot redefine variable to new type"
-doTypeAssignment (Dot e@(Var (Name tableName)) n) vExpType exp = do
-  eTExpType <- synthesis e
+doTypeAssignment (Dot tExp n) vExpType exp = do
+  eTExpType <- synthesis tExp
   case eTExpType of
     Left l -> return $ Left l
-    Right tExpType -> do
-      case typecheckTableAccess tExpType StringType vExpType of
-        Left l -> return $ Left l
-        Right l -> updateTableType tableName tExpType StringType vExpType
-doTypeAssignment (Dot tExp n) vExpType _ = do
-  eTExpType <- synthesis tExp
-  return $ case eTExpType of
-    Left l -> Left l
-    Right tExpType -> typecheckTableAccess tExpType StringType vExpType
-doTypeAssignment (Proj e@(Var (Name tableName)) kExp) vExpType exp = do
+    Right tExpType -> case (typecheckTableAccess tExpType StringType vExpType, tExp) of
+      (Left l, _) -> return $ Left l
+      (Right _, Var (Name tableName)) -> updateTableType tableName tExpType StringType vExpType
+      (Right _, _) -> return $ Right ()
+doTypeAssignment (Proj tExp kExp) vExpType exp = do
   eKExpType <- synthesis kExp
-  eTExpType <- synthesis e
-  case (eTExpType, eKExpType) of
+  eTExpType <- synthesis tExp
+  case (eKExpType, eTExpType) of
     (Left l, _) -> return $ Left l
     (_, Left l) -> return $ Left l
-    (Right tExpType, Right kExpType) -> do
-      case typecheckTableAccess tExpType kExpType vExpType of
-        Left l -> return $ Left l
-        Right l -> updateTableType tableName tExpType kExpType vExpType
-doTypeAssignment (Proj tExp kExp) vExpType _ = do
-  eKExpType <- synthesis kExp
-  eTExpType <- synthesis tExp
-  return $ case (eKExpType, eTExpType) of
-    (Right kExpType, Right tExpType) -> typecheckTableAccess tExpType kExpType vExpType
-    (Left l, _) -> Left l
-    (_, Left l) -> Left l
+    (Right kExpType, Right tExpType) -> do
+      case (typecheckTableAccess tExpType kExpType vExpType, tExp) of
+        (Left l, _) -> return $ Left l
+        (Right _, Var (Name tableName)) -> updateTableType tableName tExpType kExpType vExpType
+        (Right _, _) -> return $ Right ()
 
 -- | Check if accessing key with given type and expecting given type is valid for given table.
 typecheckTableAccess :: LType -> LType -> LType -> Either String ()
@@ -293,14 +279,6 @@ typecheckTableAccess (TableType kType vType) givenKType givenVType =
     then Right ()
     else Left "Table type sealed"
 typecheckTableAccess _ _ _ = Left "Unable to access value from non-table"
-
--- | Update variable type in store.
-updateEnv :: Reference -> LType -> Expression -> TypecheckerState ()
-updateEnv ref t exp = do
-  C.update ref t
-  case (t, exp) of
-    (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> preCheckFuncBody ref pms rt b
-    _ -> return $ Right ()
 
 -- | Typecheck function body with current state, but don't allow it to affect current state.
 preCheckFuncBody :: Reference -> [Parameter] -> LType -> Block -> TypecheckerState ()
@@ -317,11 +295,12 @@ preCheckFuncBody ref pms rt b = do
         then Right ()
         else Left $ "Expected block to return type " ++ show rt ++ " got type " ++ show actualType ++ " in body " ++ show b
 
+-- | update key and value types associated with table in env.
 updateTableType :: Name -> LType -> LType -> LType -> TypecheckerState ()
 updateTableType tableName (TableType kTypeOld vTypeOld) kTypeNew vTypeNew = do
   let kType = constructUnionType [kTypeOld, kTypeNew]
   let vType = constructUnionType [vTypeOld, vTypeNew]
-  (ref, _ :: LType) <- C.resolve tableName
+  (ref, _ :: LType) <- C.resolveName tableName
   C.update ref (TableType kType vType)
   return $ Right ()
 updateTableType _ _ _ _ = return $ Left "Cannot update non table."
@@ -381,6 +360,14 @@ typeCheckFuncBody ref = do
         Left l -> Left l
     _ -> return $ Right ()
 
+isPolymorphicBop :: Bop -> Bool
+isPolymorphicBop Eq = True
+isPolymorphicBop Gt = True
+isPolymorphicBop Ge = True
+isPolymorphicBop Lt = True
+isPolymorphicBop Le = True
+isPolymorphicBop _ = False
+
 synthesis :: Expression -> TypecheckerState LType
 synthesis (Op2 exp1 bop exp2) | isPolymorphicBop bop = synthOp2Poly bop exp1 exp2
 synthesis (Op2 exp1 bop exp2) = synthOp2 bop exp1 exp2
@@ -388,7 +375,7 @@ synthesis (Val v) = synth v
 synthesis (Var v) = synth v
 synthesis (TableConst tfs) = synth tfs
 synthesis (Call (Name n) pms) = do
-  (ref, fType :: LType) <- C.resolve n
+  (ref, fType :: LType) <- C.resolveName n
   res <- synthCall fType pms
   fBodyCheck <- typeCheckFuncBody ref
   case fBodyCheck of

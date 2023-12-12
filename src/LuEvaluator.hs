@@ -44,8 +44,8 @@ instance Environment EvalEnv Value where
   index :: Reference -> State EvalEnv Value
   index r = C.indexWithDefault r NilVal
 
-  lookup :: Name -> State EvalEnv Value
-  lookup = C.lookupWithUnknown NilVal
+  resolveName :: Name -> State EvalEnv (Reference, Value)
+  resolveName = C.resolveNameWithUnknown NilVal
 
   indexTable :: (Name, Value) -> Value -> State EvalEnv Value
   indexTable (tname, tkey) d = do
@@ -67,13 +67,7 @@ instance Environment EvalEnv Value where
         Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
 
 resolveVar :: Var -> State EvalEnv (Maybe Reference)
-resolveVar (Name n) = do
-  env <- S.get
-  let localLookup = C.getLocal n env :: Maybe Value
-  let globalLookup = C.getGlobal n env :: Maybe Value
-  return $ case (localLookup, globalLookup) of
-    (Just v, _) -> Just $ LocalRef n
-    _ -> Just $ GlobalRef n
+resolveVar (Name n) = Just . fst <$> (C.resolveName n :: State EvalEnv (Reference, Value))
 resolveVar (Dot exp n) = do
   e <- evalE exp
   return $ case e of

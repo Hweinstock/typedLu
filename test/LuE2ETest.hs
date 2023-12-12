@@ -62,7 +62,7 @@ testIOResult b = b >>= assert
 
 -- | Check property of variable in env.
 checkVarProperty :: String -> (Value -> Bool) -> EvalEnv -> Bool
-checkVarProperty targetName property env = property $ S.evalState (C.lookup targetName) env
+checkVarProperty targetName property env = property $ snd $ S.evalState (C.resolveName targetName) env
 
 -- | Check if variable holds target value in store.
 checkVarValueInStore :: String -> Value -> EvalEnv -> Bool
@@ -183,7 +183,7 @@ test_typeCheckStore =
     isNilOrUndefined :: Name -> Bool -> TypeEnv -> Bool
     isNilOrUndefined n expected env = expected == (actual == NilType || actual == UnknownType)
       where
-        actual = S.evalState (C.lookup n) env
+        actual = snd $ S.evalState (C.resolveName n) env
 
 test_error :: Test
 test_error =
