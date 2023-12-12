@@ -1,0 +1,9 @@
+function foo(x : int) : int
+    if x > 5 then 
+        return 3 
+    else 
+        y = 1
+        x = 5 
+        z = 1
+    end 
+end

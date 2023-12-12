@@ -125,7 +125,7 @@ stepper = go initialStepper
         Just (":q", _) -> return ()
         -- run current block to completion
         Just (":r", _) ->
-          let s' = exec (block ss) (env ss)
+          let s' = execWithoutError (block ss) (env ss)
            in go ss {block = mempty, env = s', history = Just ss}
         -- next statement (could be multiple)
         Just (":n", strs) -> do

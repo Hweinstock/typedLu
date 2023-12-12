@@ -1,0 +1,9 @@
+function foo(x : int) : int | string 
+    if x > 5 then 
+        return "here"
+    else 
+        return 1 
+    end 
+end 
+
+z = foo(5)

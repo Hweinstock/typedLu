@@ -1,5 +1,7 @@
 module LuEvaluator where
 
+import Context (Context, Environment, ExtendedContext, Reference (GlobalRef, LocalRef, TableRef))
+import Context qualified as C
 import Control.Monad (when)
 import Data.List qualified as List
 import Data.Map (Map, (!?))
@@ -7,8 +9,6 @@ import Data.Map qualified as Map
 import LuParser qualified
 import LuSyntax
 import LuTypes
-import Context (Context, Environment, Reference (LocalRef, GlobalRef, TableRef), ExtendedContext)
-import Context qualified as C
 import State (State)
 import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
@@ -18,57 +18,62 @@ type Store = Map Name Table
 
 type Table = Map Value Value
 
-data EvalEnv = EvalEnv { 
-  context :: Context Value,
-  tableMap :: Map Name Table
-} deriving Show
+data EvalEnv = EvalEnv
+  { context :: Context Value,
+    tableMap :: Map Name Table
+  }
+  deriving (Show)
 
-instance ExtendedContext EvalEnv where 
+instance ExtendedContext EvalEnv where
   emptyContext :: EvalEnv
   emptyContext = EvalEnv {context = C.emptyContext, tableMap = Map.empty}
 
-  exitScope :: EvalEnv -> EvalEnv 
+  exitScope :: EvalEnv -> EvalEnv
   exitScope env = env {context = C.exitScope (context env)}
 
-  enterScope :: EvalEnv -> EvalEnv 
+  enterScope :: EvalEnv -> EvalEnv
   enterScope env = env {context = C.enterScope (context env)}
 
-instance Environment EvalEnv Value where 
-  getContext :: EvalEnv -> Context Value 
-  getContext = context 
+instance Environment EvalEnv Value where
+  getContext :: EvalEnv -> Context Value
+  getContext = context
 
-  setContext :: EvalEnv -> Context Value -> EvalEnv 
+  setContext :: EvalEnv -> Context Value -> EvalEnv
   setContext env c = env {context = c}
-  
-  index :: Reference -> State EvalEnv Value 
-  index r = C.indexWithDefault r NilVal 
+
+  index :: Reference -> State EvalEnv Value
+  index r = C.indexWithDefault r NilVal
+
+  lookup :: Name -> State EvalEnv Value
+  lookup = C.lookupWithUnknown NilVal
 
   indexTable :: (Name, Value) -> Value -> State EvalEnv Value
-  indexTable (tname, tkey) d = do 
-    env <- S.get 
-    return $ case Map.lookup tname (tableMap env) of 
-      Just table -> case Map.lookup tkey table of 
-        Just v -> v 
-        _ -> d 
+  indexTable (tname, tkey) d = do
+    env <- S.get
+    return $ case Map.lookup tname (tableMap env) of
+      Just table -> case Map.lookup tkey table of
+        Just v -> v
+        _ -> d
       _ -> d
-  
+
   updateTable :: (Name, Value) -> Value -> State EvalEnv ()
-  updateTable (tname, tkey) v = do 
+  updateTable (tname, tkey) v = do
     mTable <- tableFromState tname
-    S.modify (updateTableHelper mTable) where 
-      updateTableHelper :: Maybe Table -> EvalEnv -> EvalEnv 
-      updateTableHelper mt env = case mt of 
-        Nothing -> env 
+    S.modify (updateTableHelper mTable)
+    where
+      updateTableHelper :: Maybe Table -> EvalEnv -> EvalEnv
+      updateTableHelper mt env = case mt of
+        Nothing -> env
         Just t -> env {tableMap = Map.insert tname (Map.insert tkey v t) (tableMap env)}
 
 resolveVar :: Var -> State EvalEnv (Maybe Reference)
-resolveVar (Name n) = do 
+resolveVar (Name n) = do
   env <- S.get
-  let localLookup = C.getLocal n env :: Maybe Value 
-  let globalLookup = C.getGlobal n env :: Maybe Value 
-  return $ case (localLookup, globalLookup) of 
-        (Just v, _) -> Just $ LocalRef n
-        _ -> Just $ GlobalRef n
+  let localLookup = C.getLocal n env :: Maybe Value
+  let globalLookup = C.getGlobal n env :: Maybe Value
+  return $ case (localLookup, globalLookup) of
+    (Just v, _) -> Just $ LocalRef n
+    _ -> Just $ GlobalRef n
 resolveVar (Dot exp n) = do
   e <- evalE exp
   return $ case e of
@@ -87,31 +92,33 @@ toStore :: EvalEnv -> Store
 toStore env = Map.insert globalTableName (C.gMap (context env)) (tableMap env)
 
 -- | Helper function to convert Store to evaluation environment (for testing and debugging)
-fromStore :: Store -> EvalEnv 
-fromStore s = case Map.lookup globalTableName s of 
-  Nothing -> C.emptyContext -- Shouldn't hit this cae.  
-  Just globalTable -> newEnv where 
-    newEnv = let initEnv = C.emptyContext in 
-      (C.setGMap globalTable initEnv) {tableMap = newTables} 
-        where 
+fromStore :: Store -> EvalEnv
+fromStore s = case Map.lookup globalTableName s of
+  Nothing -> C.emptyContext -- Shouldn't hit this cae.
+  Just globalTable -> newEnv
+    where
+      newEnv =
+        let initEnv = C.emptyContext
+         in (C.setGMap globalTable initEnv) {tableMap = newTables}
+        where
           newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
 
-instance PP EvalEnv where 
-  pp env = undefined 
+instance PP EvalEnv where
+  pp env = undefined
 
 globalTableName :: Name
 globalTableName = "_G"
 
-returnValueName :: Name 
+returnValueName :: Name
 returnValueName = "@R"
 
-returnFlagName :: Name 
+returnFlagName :: Name
 returnFlagName = "@F"
 
-haltFlagName :: Name 
+haltFlagName :: Name
 haltFlagName = "@H"
 
-errorCodeName :: Name 
+errorCodeName :: Name
 errorCodeName = "@E"
 
 returnValueRef :: Reference
@@ -120,42 +127,54 @@ returnValueRef = GlobalRef returnValueName
 returnFlagRef :: Reference
 returnFlagRef = GlobalRef returnFlagName
 
-haltFlagRef :: Reference 
+haltFlagRef :: Reference
 haltFlagRef = GlobalRef haltFlagName
 
-errorCodeRef :: Reference 
+errorCodeRef :: Reference
 errorCodeRef = GlobalRef errorCodeName
 
-throwError :: ErrorCode -> State EvalEnv () 
-throwError ec = C.update errorCodeRef (ErrorVal ec) >> C.update haltFlagRef (BoolVal True) 
+throwError :: ErrorCode -> State EvalEnv ()
+throwError ec = C.update errorCodeRef (ErrorVal ec) >> C.update haltFlagRef (BoolVal True)
 
-didReturnOrHalt :: State EvalEnv Bool 
-didReturnOrHalt = do 
-  didReturn <- isReturnFlagSet 
-  didHalt <- isHaltFlagSet 
+didReturnOrHalt :: State EvalEnv Bool
+didReturnOrHalt = do
+  didReturn <- isReturnFlagSet
+  didHalt <- isHaltFlagSet
   return $ didReturn || didHalt
 
 -- | Check if we should terminate, if so return stopCase otherwise continue with eval
-continueWithFlags :: a -> State EvalEnv a -> State EvalEnv a 
-continueWithFlags stopCase continue = do 
+continueWithFlags :: a -> State EvalEnv a -> State EvalEnv a
+continueWithFlags stopCase continue = do
   shouldStop <- didReturnOrHalt
   if shouldStop then return stopCase else continue
 
-isError :: Value -> Bool 
-isError (ErrorVal _) = True 
-isError _ = False 
+isError :: Value -> Bool
+isError (ErrorVal _) = True
+isError _ = False
 
-isFlagSet :: Name -> State EvalEnv Bool 
-isFlagSet n = do 
-  value <- evalE (Var (Name n))
-  return $ case value of 
-    (BoolVal True) -> True 
+didError :: EvalEnv -> Bool
+didError env =
+  case S.evalState (C.index haltFlagRef) env of
+    (BoolVal True) -> True
     _ -> False
 
-isReturnFlagSet :: State EvalEnv Bool 
+getError :: EvalEnv -> ErrorCode
+getError env =
+  case S.evalState (C.index errorCodeRef) env of
+    (ErrorVal e) -> e
+    _ -> UnknownError
+
+isFlagSet :: Name -> State EvalEnv Bool
+isFlagSet n = do
+  value <- evalE (Var (Name n))
+  return $ case value of
+    (BoolVal True) -> True
+    _ -> False
+
+isReturnFlagSet :: State EvalEnv Bool
 isReturnFlagSet = isFlagSet returnFlagName
 
-isHaltFlagSet :: State EvalEnv Bool 
+isHaltFlagSet :: State EvalEnv Bool
 isHaltFlagSet = isFlagSet haltFlagName
 
 tableFromState :: Name -> State EvalEnv (Maybe Table)
@@ -179,12 +198,12 @@ nonNil (k, v) = k /= NilVal && v /= NilVal
 
 -- | Expression evaluator
 evalE :: Expression -> State EvalEnv Value
-evalE e = do 
+evalE e = do
   v <- doEvalE e
-  case v of 
+  case v of
     (ErrorVal ec) -> throwError ec >> return v
     _ -> return v
-  where 
+  where
     doEvalE (Var v) = do
       mr <- resolveVar v -- see above
       case mr of
@@ -197,42 +216,42 @@ evalE e = do
       e' <- evalE e
       evalOp1 o e'
     doEvalE (TableConst _fs) = evalTableConst _fs
-    doEvalE (Call func pps) = do 
-      fv <- evalE (Var func) 
-      case fv of 
-        (FunctionVal ps rt b) -> do 
+    doEvalE (Call func pps) = do
+      fv <- evalE (Var func)
+      case fv of
+        (FunctionVal ps rt b) -> do
           parameters <- evalParameters (map fst ps) pps
           let extParameters = (returnValueName, NilVal) : (returnFlagName, BoolVal False) : parameters
-          C.prepareFunctionEnv extParameters 
-          eval b 
-          returnValue <- evalE (Var (Name returnValueName)) 
+          C.prepareFunctionEnv extParameters
+          eval b
+          returnValue <- evalE (Var (Name returnValueName))
           S.modify C.exitScope
           return returnValue
         _ -> return NilVal
 
 evalParameters :: [Name] -> [Expression] -> State EvalEnv [(Name, Value)]
-evalParameters pNames pExps = do 
-  pValues <- seqEval pExps 
+evalParameters pNames pExps = do
+  pValues <- seqEval pExps
   return $ zip pNames pValues
 
--- | Set list of parameters to list of expressions, return resulting state. 
-setVars :: [Name] -> [Expression] -> State EvalEnv () 
-setVars pNames pps = do 
+-- | Set list of parameters to list of expressions, return resulting state.
+setVars :: [Name] -> [Expression] -> State EvalEnv ()
+setVars pNames pps = do
   values <- seqEval pps
   foldr seqSet (return ()) (zip values pNames)
-  where 
-    seqSet :: (Value, Name) -> State EvalEnv () -> State EvalEnv () 
+  where
+    seqSet :: (Value, Name) -> State EvalEnv () -> State EvalEnv ()
     seqSet p@(v, n) s = s >> evalS (Assign (Name n, UnknownType) (Val v))
-    
 
--- | Evaluate a list of expressions in sequence (passing state along right to left), returning all values in final state monad. 
+-- | Evaluate a list of expressions in sequence (passing state along right to left), returning all values in final state monad.
 seqEval :: [Expression] -> State EvalEnv [Value]
-seqEval = foldr seqEvalHelper (return []) where 
-  seqEvalHelper :: Expression -> State EvalEnv [Value] -> State EvalEnv [Value]
-  seqEvalHelper e s = do 
-    curValues <- s
-    newValue <- evalE e 
-    return (newValue : curValues)
+seqEval = foldr seqEvalHelper (return [])
+  where
+    seqEvalHelper :: Expression -> State EvalEnv [Value] -> State EvalEnv [Value]
+    seqEvalHelper e s = do
+      curValues <- s
+      newValue <- evalE e
+      return (newValue : curValues)
 
 fieldToPair :: TableField -> State EvalEnv (Value, Value)
 fieldToPair (FieldName n exp) = do
@@ -258,9 +277,9 @@ evalTableConst xs = do
     helper = foldr accuFieldToPair (return [])
 
 getTableSize :: String -> State EvalEnv (Maybe Int)
-getTableSize v = do 
-  s <- S.get 
-  return $ case Map.lookup v (tableMap s) of 
+getTableSize v = do
+  s <- S.get
+  return $ case Map.lookup v (tableMap s) of
     Just t -> Just $ length t
     _ -> Nothing
 
@@ -309,25 +328,33 @@ eval (Block ss) = mapM_ evalS ss
 
 -- | Statement evaluator
 evalS :: Statement -> State EvalEnv ()
-evalS s = continueWithFlags () (doEvalS s) where 
-  doEvalS (If e s1 s2) = do
-    v <- evalE e
-    if toBool v then eval s1 else eval s2
-  doEvalS w@(While e ss) = do
-    v <- evalE e
-    when (toBool v) $ do
-      eval ss
-      evalS w
-  doEvalS (Assign (v, _) e) = do
-    -- update global variable or table field v to value of e
-    mRef <- resolveVar v
-    e' <- evalE e
-    case mRef of
-      Just ref -> C.update ref e'
-      _ -> return ()
-  doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
-  doEvalS (Return e) = evalS (Assign (Name returnValueName, UnknownType) e) >> evalS (Assign (Name returnFlagName, BooleanType) (Val (BoolVal True)))
-  doEvalS Empty = return () -- do nothing
+evalS s = continueWithFlags () (doEvalS s)
+  where
+    doEvalS (If e s1 s2) = do
+      v <- evalE e
+      if toBool v then eval s1 else eval s2
+    doEvalS w@(While e ss) = do
+      v <- evalE e
+      when (toBool v) $ do
+        eval ss
+        evalS w
+    doEvalS (Assign (v, _) e) = do
+      -- update global variable or table field v to value of e
+      mRef <- resolveVar v
+      e' <- evalE e
+      case mRef of
+        Just ref -> C.update ref e'
+        _ -> return ()
+    doEvalS s@(Repeat b e) = evalS (While (Op1 Not e) b) -- keep evaluating block b until expression e is true
+    doEvalS (Return e) = evalS (Assign (Name returnValueName, UnknownType) e) >> evalS (Assign (Name returnFlagName, BooleanType) (Val (BoolVal True)))
+    doEvalS Empty = return () -- do nothing
 
-exec :: Block -> EvalEnv -> EvalEnv
-exec = S.execState . eval
+execWithoutError :: Block -> EvalEnv -> EvalEnv
+execWithoutError = S.execState . eval
+
+exec :: Block -> EvalEnv -> Either String EvalEnv
+exec b env =
+  let finalEnv = S.execState (eval b) env
+   in if didError finalEnv
+        then Left $ (show . getError) finalEnv
+        else return finalEnv

@@ -2,7 +2,7 @@ module LuStepperTest where
 
 import LuSyntax
 import LuStepper
-import LuEvaluator (EvalEnv, globalTableName, exec, toStore, Store, fromStore)
+import LuEvaluator (EvalEnv, globalTableName, execWithoutError, toStore, Store, fromStore)
 import LuEvaluatorTest (initialEnv, extendedEnv)
 import State (State)
 import State qualified as S
@@ -88,7 +88,7 @@ test_step_with_errors =
   "exec with errors" ~: 
     TestList 
       [
-        toStore (exec b initialEnv) ~?= toStore (S.execState (boundedStep 100 b) initialEnv)
+        toStore (execWithoutError b initialEnv) ~?= toStore (S.execState (boundedStep 100 b) initialEnv)
       ]
       where 
           b = Block [If (Op1 Neg (Var (Name "x"))) (Block []) (Block []),If (TableConst []) (Block []) (Block [])]
@@ -101,7 +101,7 @@ prop_stepExec b =
   not (final b) QC.==> final b1 QC.==> toStore m1 == toStore m2
   where
     (b1, m1) = S.runState (boundedStep 100 b) initialEnv
-    m2 = exec b initialEnv
+    m2 = execWithoutError b initialEnv
 
 -- | Make sure that we can step every block in every store
 prop_step_total :: Block -> Store -> Bool
