@@ -439,6 +439,28 @@ genBlock m n = Block <$> genStmts n
       where
         n' = n `div` 2
 
+-- | Generate a size-controlled type
+genType :: Bool -> Gen LType
+genType False = QC.oneof [return IntType, return StringType, return BooleanType]
+genType True =
+  QC.oneof
+    [ return IntType,
+      return StringType,
+      return BooleanType,
+      TableType <$> genParameterType <*> genType False,
+      FunctionType <$> genParameterType <*> genType False
+    ]
+
+-- | Generate a parameter type
+genParameterType :: Gen LType
+genParameterType =
+  QC.oneof 
+    [ return IntType,
+      return StringType,
+      return BooleanType,
+      UnionType <$> genType False <*> genType False
+    ]
+
 instance Arbitrary Var where
   arbitrary = QC.sized (genVar Map.empty)
   shrink (Name n) = []
