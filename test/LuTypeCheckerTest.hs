@@ -284,20 +284,20 @@ test_typeCheckStatement :: Test
 test_typeCheckStatement =
   "typechecking statement" ~:
     TestList
-      [ S.evalState (synth (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))]))), Never)) emptyTypeEnv ~?= Right NilType,
-        S.evalState (synth (Return (Val (StringVal "foo")), StringType)) emptyTypeEnv ~?= Right StringType,
-        S.evalState (synth (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))]), StringType)) emptyTypeEnv ~?= Right StringType
+      [ runForType (synth (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))]))), Never)) emptyTypeEnv UnknownType ~?= NilType,
+        runForType (synth (Return (Val (StringVal "foo")), StringType)) emptyTypeEnv UnknownType ~?= StringType,
+        runForType (synth (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))]), StringType)) emptyTypeEnv UnknownType ~?= StringType
       ]
 
 test_typeCheckBlock :: Test
 test_typeCheckBlock =
   "typechecking block" ~:
     TestList
-      [ S.evalState (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])], StringType)) emptyTypeEnv ~?= Right StringType,
-        S.evalState (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])], (UnionType StringType IntType))) emptyTypeEnv ~?= Right (UnionType StringType IntType),
-        S.evalState (synth (Block [Return (Val (StringVal "foo"))], StringType)) emptyTypeEnv ~?= Right StringType,
-        S.evalState (synth (Block [Return (Val (IntVal 5))], IntType)) emptyTypeEnv ~?= Right IntType,
-        S.evalState (synth (Block [], NilType)) emptyTypeEnv ~?= Right NilType
+      [ runForType (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])], StringType)) emptyTypeEnv UnknownType ~?= StringType,
+        runForType (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])], UnionType StringType IntType)) emptyTypeEnv UnknownType ~?= UnionType StringType IntType,
+        runForType (synth (Block [Return (Val (StringVal "foo"))], StringType)) emptyTypeEnv UnknownType ~?= StringType,
+        runForType (synth (Block [Return (Val (IntVal 5))], IntType)) emptyTypeEnv UnknownType ~?= IntType,
+        runForType (synth (Block [], NilType)) emptyTypeEnv UnknownType ~?= NilType
       ]
 
 test_typeCheckBlocks :: Test
@@ -313,9 +313,9 @@ test_typeCheckConditionalBlocks :: Test
 test_typeCheckConditionalBlocks =
   "typehecking conditional Blocks" ~:
     TestList
-      [ S.evalState (typeCheckConditionalBlocks (Val (BoolVal True)) StringType [Block [Return (Val (StringVal "here"))]] "error") C.emptyContext ~?= Right StringType,
-        S.evalState (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType StringType IntType) [Block [Return (Val (StringVal "here")), Return (Val (IntVal 5))]] "error") C.emptyContext ~?= Right (UnionType StringType IntType),
-        S.evalState (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType NilType IntType) [Block [Return (Val NilVal), Empty]] "error") C.emptyContext ~?= Right (UnionType NilType IntType)
+      [ runForType (typeCheckConditionalBlocks (Val (BoolVal True)) StringType [Block [Return (Val (StringVal "here"))]] "error") C.emptyContext UnknownType ~?= StringType,
+        runForType (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType StringType IntType) [Block [Return (Val (StringVal "here")), Return (Val (IntVal 5))]] "error") C.emptyContext UnknownType ~?= UnionType StringType IntType,
+        runForType (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType NilType IntType) [Block [Return (Val NilVal), Empty]] "error") C.emptyContext UnknownType ~?= UnionType NilType IntType
       ]
 
 test_uncalledFunc :: Test

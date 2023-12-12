@@ -1,5 +1,7 @@
 module Context where
 
+import Control.Monad.State (MonadState)
+import Control.Monad.State qualified as State
 import Data.Map (Map)
 import Data.Map qualified as Map
 import LuSyntax
@@ -37,30 +39,30 @@ class (Eq v) => Environment a v where
   getContext :: a -> Context v
   setContext :: a -> Context v -> a
 
-  index :: Reference -> State a v
+  index :: (MonadState a m) => Reference -> m v
 
-  indexTable :: (Name, Value) -> v -> State a v
+  indexTable :: (MonadState a m) => (Name, Value) -> v -> m v
 
-  updateTable :: (Name, Value) -> v -> State a ()
+  updateTable :: (MonadState a m) => (Name, Value) -> v -> m ()
 
-  resolveName :: Name -> State a (Reference, v)
+  resolveName :: (MonadState a m) => Name -> m (Reference, v)
 
-  indexWithDefault :: Reference -> v -> State a v
+  indexWithDefault :: (MonadState a m) => Reference -> v -> m v
   indexWithDefault (GlobalRef n) d = do
-    env <- S.get
+    env <- State.get
     return $ case getGlobal n env of
       Just v -> v
       _ -> d
   indexWithDefault (LocalRef n) d = do
-    env <- S.get
+    env <- State.get
     return $ case getLocal n env of
       Just v -> v
       _ -> d
   indexWithDefault (TableRef tname tkey) d = indexTable (tname, tkey) d
 
-  update :: Reference -> v -> State a ()
-  update (GlobalRef n) v = S.modify (addGlobal (n, v))
-  update (LocalRef n) v = S.modify (addLocal (n, v))
+  update :: (MonadState a m) => Reference -> v -> m ()
+  update (GlobalRef n) v = State.modify (addGlobal (n, v) :: a -> a)
+  update (LocalRef n) v = State.modify (addLocal (n, v))
   update (TableRef n k) v = updateTable (n, k) v
 
   -- Internal method.
@@ -90,19 +92,19 @@ class (Eq v) => Environment a v where
     let c = getContext env
      in setContext env (c {gMap = m})
 
-  resolveNameWithUnknown :: v -> Name -> State a (Reference, v)
+  resolveNameWithUnknown :: (MonadState a m) => v -> Name -> m (Reference, v)
   resolveNameWithUnknown unknown n = do
-    localResolve <- index (LocalRef n) :: State a v
-    globalResolve <- index (GlobalRef n) :: State a v
+    localResolve <- index (LocalRef n)
+    globalResolve <- index (GlobalRef n)
     if localResolve == unknown
       then return (GlobalRef n, globalResolve)
       else return (LocalRef n, localResolve)
 
-  prepareFunctionEnv :: [(Name, v)] -> State a ()
+  prepareFunctionEnv :: (MonadState a m) => [(Name, v)] -> m ()
   prepareFunctionEnv params = do
     let getThisContext = getContext :: a -> Context v
-    S.modify (\env -> setContext env (enterScope (getThisContext env)))
-    S.modify (\e -> foldr addLocal e params)
+    State.modify (\env -> setContext env (enterScope (getThisContext env)))
+    State.modify (\e -> foldr addLocal e params)
 
 instance ExtendedContext (Context a) where
   emptyContext :: Context a
