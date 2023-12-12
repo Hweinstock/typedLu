@@ -72,9 +72,6 @@ updateRef ref t exp = do
     (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> preCheckFuncBody ref pms rt b
     _ -> return ()
 
--- type TypecheckerState a = State TypeEnv (Either String a)
--- type TypecheckerState m a = (MonadError String m, MonadState Int m) => m a
-
 class Synthable a where
   synth :: (MonadError String m, MonadState TypeEnv m) => a -> m LType
 
@@ -119,12 +116,6 @@ instance Synthable Var where
     case expType of
       t@(TableType t1 t2) -> typecheckTableAccess t StringType Never >> return t2
       _ -> throwError "Cannot access non table type via dot method"
-  -- return $ case eExpType of
-  --   Left l -> Left l
-  --   Right tExp@(TableType t1 t2) -> case typecheckTableAccess tExp StringType Never of
-  --     Right () -> Right t2
-  --     Left l -> Left l
-  --   Right _ -> Left "Cannot access non table type via dot method."
   synth (Proj tExp kExp) = do
     tableType <- synthesis tExp
     keyType <- synthesis kExp
@@ -133,26 +124,12 @@ instance Synthable Var where
       TableType t1 t2 -> return t2
       _ -> throwError "Cannot access not table type via proj method."
 
--- return $ case (eTableType, eKeyType) of
---   (Left l, _) -> Left l
---   (_, Left l) -> Left l
---   (Right tableType@(TableType t1 t2), Right keyType) -> case typecheckTableAccess tableType keyType Never of
---     Right () -> Right t2
---     Left l -> Left l
---   _ -> Left "Cannot access not table type via proj method."
-
 instance Synthable [TableField] where
   synth tfs = do
     typePairs <- foldr synthTableField (return []) tfs
     let (keyTypes, valTypes) = unzip typePairs
     return $ TableType (constructUnionType keyTypes) (constructUnionType valTypes)
     where
-      -- return $ case eTypePairs of
-      --   Left l -> Left l
-      --   Right typePairs -> do
-      --     let (keyTypes, valTypes) = unzip typePairs
-      --     Right $ TableType (constructUnionType keyTypes) (constructUnionType valTypes)
-
       synthTableField :: (MonadError String m, MonadState TypeEnv m) => TableField -> m [(LType, LType)] -> m [(LType, LType)]
       synthTableField (FieldName n e) res = synthTableField (FieldKey (Val (StringVal n)) e) res
       synthTableField (FieldKey e1 e2) res = do
@@ -160,12 +137,6 @@ instance Synthable [TableField] where
         t1 <- synthesis e1
         t2 <- synthesis e2
         return $ (t1, t2) : pairsSoFar
-
--- case (ePairs, eT1, eT2) of
---   (Right pairs, Right t1, Right t2) -> return $ Right ((t1, t2) : pairs)
---   (Left l, _, _) -> return $ Left l
---   (_, Left l, _) -> return $ Left l
---   (_, _, Left l) -> return $ Left l
 
 instance Synthable (Statement, LType) where
   -- \| Given a statement, an environment and an expected return type, check if the types are consistent in the statement.
@@ -180,14 +151,10 @@ instance Synthable (Statement, LType) where
   synth (Repeat b exp, expectedReturnType) = typeCheckConditionalBlocks exp expectedReturnType [b] "Non-boolean in repeat condition"
   synth (Return exp, expectedReturnType) = do
     sameType <- checker exp expectedReturnType
+    actualType <- synthesis exp
     if sameType
-      then return expectedReturnType
+      then return actualType
       else throwError "return type mismatch"
-
--- case eRes of
---   Left error -> return $ Left error
---   Right False -> throwError "Return" expectedReturnType exp
---   Right True -> return $ Right expectedReturnType
 
 instance Synthable (Block, LType) where
   -- \| Given a block, an environment, and an expected return type, return the type returned by the block.
@@ -198,55 +165,16 @@ instance Synthable (Block, LType) where
     case s of
       (Return exp) -> do
         sameType <- checker exp statementType
+        actualType <- synthesis exp
         if sameType
-          then return expectedReturnType
+          then return actualType
           else throwError "BlockType mismatch"
       _ -> synth (Block ss, expectedReturnType)
-
-  -- case (s, curCheck) of
-  --   (_, Left l) -> return $ Left l
-  --   (Return exp, Right t) -> do
-  --     eRes <- checker exp t
-  --     case eRes of
-  --       Left l -> return $ Left l
-  --       Right False -> throwError "BlockType" expectedReturnType exp
-  --       Right True -> return $ Right t
-  --   (_, Right t) -> synth (Block ss, expectedReturnType)
   synth (Block [], expectedReturnType) = return NilType
 
 -- Given AST and env, typechecks it.
--- typeCheckAST :: (MonadError String m) => Block -> TypeEnv -> m ()
--- typeCheckAST :: (MonadError [Char] m, Synthable (a, LType)) => a -> TypeEnv -> m ()
 typeCheckAST :: (MonadError String m) => Block -> TypeEnv -> m LType
 typeCheckAST b = State.evalStateT (synth (b, Never))
-
--- Given AST and env, typechecks it, returning resulting store.
--- runForEnv :: (MonadError String m, MonadState TypeEnv m) => Block -> TypeEnv -> m TypeEnv
--- runForEnv b env = run (synth (b, Never)) env
-
--- case State.runStateT (synth (b, Never)) env of
--- (t, (_, finalStore)) -> return finalStore
-
--- (l, _) -> throwErr
-
--- throwError :: String -> LType -> Expression -> TypecheckerState a
--- throwError errorType expectedType exp = do
---   eActualType <- synthesis exp
---   env <- S.get
---   case eActualType of
---     Left error -> return $ Left error
---     Right actualType ->
---       return $
---         Left $
---           errorType
---             ++ ": expected type \
---                \["
---             ++ pretty expectedType
---             ++ "]\
---                \ got type ["
---             ++ pretty actualType
---             ++ "]"
---             ++ show env
 
 -- | typeCheck blocks individually, with some state.
 typeCheckBlocks :: (MonadError String m) => TypeEnv -> LType -> [Block] -> m LType
@@ -258,23 +186,15 @@ typeCheckBlocks env expectedReturnType = foldr checkBlock (return Never)
       newT <- State.evalStateT (synth (b, expectedReturnType)) env
       return $ constructUnionType [prevTT, newT]
 
--- checkBlock b l@(Left _) = l
--- checkBlock b (Right prevT) = case S.evalState (synth (b, expectedReturnType)) env of
---   l@(Left _) -> l
---   Right nextT -> Right $ constructUnionType [prevT, nextT]
-
 -- | Check that given expression is boolean, then check underlying blocks.
 typeCheckConditionalBlocks :: (MonadError String m, MonadState TypeEnv m) => Expression -> LType -> [Block] -> String -> m LType
 typeCheckConditionalBlocks exp expectedReturnType bs errorStr = do
-  res <- checker exp BooleanType
+  res <- synthesis exp
   curStore <- State.get
-  if res
+  -- Any type can be in the if/while condition (but it must be typeable)
+  if res /= UnknownType && res /= Never && res /= AnyType
     then typeCheckBlocks curStore expectedReturnType bs
     else throwError errorStr
-
--- case eRes of
---   Right True -> return $ typeCheckBlocks curStore expectedReturnType bs
---   _ -> return $ Left errorStr
 
 typeCheckAssign :: (MonadError String m, MonadState TypeEnv m) => Var -> LType -> Expression -> m LType
 typeCheckAssign v UnknownType exp = throwError ("Can not determine type of [" ++ pretty exp ++ "]")
@@ -284,12 +204,6 @@ typeCheckAssign v t exp = do
   if sameType
     then return NilType
     else throwError "AssignmentError"
-
--- case (res, eSameType) of
---   (Left error, _) -> return $ Left error
---   (_, Left error) -> return $ Left error
---   (_, Right False) -> throwError "AssignmentError" t exp
---   (_, Right True) -> return $ Right NilType
 
 -- Given var, its determined type, and
 doTypeAssignment :: (MonadError String m, MonadState TypeEnv m) => Var -> LType -> Expression -> m ()
@@ -304,30 +218,12 @@ doTypeAssignment (Dot tExp n) vExpType exp = do
   case tExp of
     (Var (Name tableName)) -> updateTableType tableName tableType StringType vExpType
     _ -> return ()
--- eTExpType <- synthesis tExp
--- case eTExpType of
---   Left l -> return $ Left l
---   Right tExpType -> case (typecheckTableAccess tExpType StringType vExpType, tExp) of
---     (Left l, _) -> return $ Left l
---     (Right _, Var (Name tableName)) -> updateTableType tableName tExpType StringType vExpType
---     (Right _, _) -> return $ Right ()
 doTypeAssignment (Proj tExp kExp) vExpType exp = do
   keyType <- synthesis kExp
   tableType <- synthesis tExp
   case tExp of
     (Var (Name tableName)) -> updateTableType tableName tableType keyType vExpType
     _ -> return ()
-
--- eKExpType <- synthesis kExp
--- eTExpType <- synthesis tExp
--- case (eKExpType, eTExpType) of
---   (Left l, _) -> return $ Left l
---   (_, Left l) -> return $ Left l
---   (Right kExpType, Right tExpType) -> do
---     case (typecheckTableAccess tExpType kExpType vExpType, tExp) of
---       (Left l, _) -> return $ Left l
---       (Right _, Var (Name tableName)) -> updateTableType tableName tExpType kExpType vExpType
---       (Right _, _) -> return $ Right ()
 
 -- | Check if accessing key with given type and expecting given type is valid for given table.
 typecheckTableAccess :: (MonadError String m) => LType -> LType -> LType -> m ()
@@ -349,13 +245,6 @@ preCheckFuncBody ref pms rt b = do
     then return ()
     else throwError $ "Expected block to return type " ++ show rt ++ " got type " ++ show blockType ++ " in body " ++ show b
 
--- return $ case blockType of
---   Left l -> Left l
---   Right actualType ->
---     if actualType <: rt
---       then Right ()
---       else Left $ "Expected block to return type " ++ show rt ++ " got type " ++ show actualType ++ " in body " ++ show b
-
 -- | update key and value types associated with table in env.
 updateTableType :: (MonadError String m, MonadState TypeEnv m) => Name -> LType -> LType -> LType -> m ()
 updateTableType tableName (TableType kTypeOld vTypeOld) kTypeNew vTypeNew = do
@@ -372,45 +261,23 @@ checkSameType e1 e2 = do
   t2 <- synthesis e2
   return (t1 <: t2 && t2 <: t1)
 
--- case (eT1, eT2) of
---   (Right t1, Right t2) -> return $ Right (t1 <: t2 && t2 <: t1)
---   (Left error, _) -> return $ Left error
---   (_, Left error) -> return $ Left error
-
 synthCall :: (MonadError String m, MonadState TypeEnv m) => LType -> [Expression] -> m LType
 synthCall (FunctionType Never returnType) [] = return returnType
 synthCall (FunctionType paramType returnType) (p : ps) = do
   let nextFunction = if null ps then FunctionType Never returnType else returnType
   sameType <- checker p paramType
   if sameType then synthCall nextFunction ps else throwError "Parameter Assignment"
--- case eRes of
---   (Left l) -> return l
---   Right False -> throwError "ParameterAssignment" paramType p
---   Right True -> synthCall nextFunction ps
 synthCall t _ = throwError ("CallNonFunc: Cannot call type [" ++ show t ++ "]")
-
--- do
--- env <- State.get
--- return $ Left ("CallNonFunc: Cannot call type [" ++ show t ++ "]" ++ show env)
 
 synthOp2 :: (MonadError String m, MonadState TypeEnv m) => Bop -> Expression -> Expression -> m LType
 synthOp2 op e1 e2 = do
   opType <- synth op
   synthCall opType [e1, e2]
 
--- case eOpType of
---   Right opType -> synthCall opType [e1, e2]
---   (Left error) -> return $ Left error
-
 synthOp2Poly :: (MonadError String m, MonadState TypeEnv m) => Bop -> Expression -> Expression -> m LType
 synthOp2Poly op e1 e2 = do
   sameType <- checkSameType e1 e2
   if sameType then synthOp2 op e1 e2 else throwError "Recieved two different types in Op2 execution."
-
--- case eSameType of
---   Right False -> return $ Left "Recieved two different types in Op2 execution."
---   (Left error) -> return $ Left error
---   Right True -> synthOp2 op e1 e2
 
 typeCheckFuncBody :: (MonadError String m, MonadState TypeEnv m) => Reference -> m ()
 typeCheckFuncBody ref = do
@@ -426,14 +293,6 @@ typeCheckFuncBody ref = do
         then return ()
         else throwError $ "Return: expected type " ++ show rt ++ " but got type " ++ show blockType
     _ -> return ()
-
---   return $ case res of
---     Right t ->
---       if t <: rt
---         then return ()
---         else Left $ "Return: expected type " ++ show rt ++ " but got type " ++ show t
---     Left l -> Left l
--- _ -> return $ Right ()
 
 isPolymorphicBop :: Bop -> Bool
 isPolymorphicBop Eq = True
@@ -454,15 +313,9 @@ synthesis (Call (Name n) pms) = do
   res <- synthCall fType pms
   bodyCheck <- typeCheckFuncBody ref
   return res
--- case fBodyCheck of
---   Left error -> return $ Left error
---   Right () -> return res
 synthesis (Op1 uop exp) = do
   opType <- synth uop
   synthCall opType [exp]
--- case eOpType of
---   Right opType -> synthCall opType [exp]
---   l@(Left _) -> return l
 synthesis (Call v pms) = undefined
 
 checker :: (MonadError String m, MonadState TypeEnv m) => Expression -> LType -> m Bool
@@ -470,23 +323,17 @@ checker exp expectedType = do
   expType <- synthesis exp
   return $ expType <: expectedType
 
--- return $ case eType of
---   Left l -> Left l
---   Right actualType -> Right $ actualType <: expectedType
-
 runSynthesis :: TypeEnv -> Expression -> LType
-runSynthesis env exp = case runExceptT $ State.evalStateT (synthesis exp) env of
-  Right (Right v) -> v
-  _ -> UnknownType
+runSynthesis env exp = case runExcept $ State.evalStateT (synthesis exp) env of
+  Right t -> t
+  Left _ -> UnknownType
 
 -- | Check that type of given expression is an instance of given type.
 runChecker :: TypeEnv -> Expression -> LType -> Bool
 runChecker env e = (<:) (runSynthesis env e)
 
-runForType :: StateT s (ExceptT e (Either a)) LType -> s -> LType -> LType
-runForType p env fail = case runExceptT (State.evalStateT p env) of
-  Right (Right v) -> v
-  _ -> fail
+evalType :: (Synthable (a, LType)) => a -> TypeEnv -> Either String LType
+evalType b env = runExcept $ State.evalStateT (synth (b, AnyType)) env
 
-runForEnv :: (Synthable (a, LType)) => a -> TypeEnv -> Either String TypeEnv
-runForEnv b env = runExcept $ State.execStateT (synth (b, Never)) env
+execEnv :: (Synthable (a, LType)) => a -> TypeEnv -> Either String TypeEnv
+execEnv b env = runExcept $ State.execStateT (synth (b, Never)) env

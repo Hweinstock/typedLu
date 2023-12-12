@@ -10,7 +10,7 @@ import LuEvaluator (EvalEnv, Store, errorCodeName, eval, exec, globalTableName, 
 import LuEvaluatorTest (initialEnv)
 import LuParser (parseLuFile)
 import LuSyntax
-import LuTypeChecker (TypeEnv, getUncalledFunc, runForEnv, typeCheckAST)
+import LuTypeChecker (TypeEnv, execEnv, getUncalledFunc, typeCheckAST)
 import LuTypes
 import State qualified as S
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
@@ -41,7 +41,7 @@ instance TestableEnvironment EvalEnv where
 
 instance TestableEnvironment TypeEnv where
   execBlock :: Block -> TypeEnv -> Either String TypeEnv
-  execBlock = runForEnv
+  execBlock = execEnv
 
 testTypeCheckFile :: String -> Bool -> IO Assertion
 testTypeCheckFile fp expected = do

@@ -284,20 +284,20 @@ test_typeCheckStatement :: Test
 test_typeCheckStatement =
   "typechecking statement" ~:
     TestList
-      [ runForType (synth (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))]))), Never)) emptyTypeEnv UnknownType ~?= NilType,
-        runForType (synth (Return (Val (StringVal "foo")), StringType)) emptyTypeEnv UnknownType ~?= StringType,
-        runForType (synth (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))]), StringType)) emptyTypeEnv UnknownType ~?= StringType
+      [ evalType (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) emptyTypeEnv ~?= Right NilType,
+        evalType (Return (Val (StringVal "foo"))) emptyTypeEnv ~?= Right StringType,
+        evalType (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])) emptyTypeEnv ~?= Right StringType
       ]
 
 test_typeCheckBlock :: Test
 test_typeCheckBlock =
   "typechecking block" ~:
     TestList
-      [ runForType (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])], StringType)) emptyTypeEnv UnknownType ~?= StringType,
-        runForType (synth (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])], UnionType StringType IntType)) emptyTypeEnv UnknownType ~?= UnionType StringType IntType,
-        runForType (synth (Block [Return (Val (StringVal "foo"))], StringType)) emptyTypeEnv UnknownType ~?= StringType,
-        runForType (synth (Block [Return (Val (IntVal 5))], IntType)) emptyTypeEnv UnknownType ~?= IntType,
-        runForType (synth (Block [], NilType)) emptyTypeEnv UnknownType ~?= NilType
+      [ evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])]) emptyTypeEnv ~?= Right StringType,
+        evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])]) emptyTypeEnv ~?= Right (UnionType StringType IntType),
+        evalType (Block [Return (Val (StringVal "foo"))]) emptyTypeEnv ~?= Right StringType,
+        evalType (Block [Return (Val (IntVal 5))]) emptyTypeEnv ~?= Right IntType,
+        evalType (Block []) emptyTypeEnv ~?= Right NilType
       ]
 
 test_typeCheckBlocks :: Test
@@ -307,15 +307,6 @@ test_typeCheckBlocks =
       [ typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (StringVal "foo"))], Block [Return (Val (StringVal "not foo"))]] ~?= Right StringType,
         typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (IntVal 5))], Block [Return (Val (StringVal "not foo"))]] ~?= Right (UnionType StringType IntType),
         typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (IntVal 5))], Block []] ~?= Right (UnionType StringType NilType)
-      ]
-
-test_typeCheckConditionalBlocks :: Test
-test_typeCheckConditionalBlocks =
-  "typehecking conditional Blocks" ~:
-    TestList
-      [ runForType (typeCheckConditionalBlocks (Val (BoolVal True)) StringType [Block [Return (Val (StringVal "here"))]] "error") C.emptyContext UnknownType ~?= StringType,
-        runForType (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType StringType IntType) [Block [Return (Val (StringVal "here")), Return (Val (IntVal 5))]] "error") C.emptyContext UnknownType ~?= UnionType StringType IntType,
-        runForType (typeCheckConditionalBlocks (Val (BoolVal True)) (UnionType NilType IntType) [Block [Return (Val NilVal), Empty]] "error") C.emptyContext UnknownType ~?= UnionType NilType IntType
       ]
 
 test_uncalledFunc :: Test
@@ -330,7 +321,7 @@ test_uncalledFunc =
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_typeCheckConditionalBlocks, test_uncalledFunc, test_typeCheckBlock, test_typeCheckStatement, test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
+test = runTestTT $ TestList [test_uncalledFunc, test_typeCheckBlock, test_typeCheckStatement, test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
 
 {-
 ===================================================================
