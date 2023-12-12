@@ -44,7 +44,6 @@ boolValP = BoolVal <$> wsP (trueP <|> falseP)
     falseP :: Parser Bool
     falseP = constP "false" False
 
-
 nilValP :: Parser Value
 nilValP = constP "nil" NilVal
 
@@ -75,7 +74,7 @@ expP = compP
         <|> parens expP
         <|> Val <$> valueP
 
-typedExpP :: Parser TypedExpression 
+typedExpP :: Parser TypedExpression
 typedExpP = liftA2 (,) expP (afterP ":" lTypeP)
 
 -- | Parse an operator at a specified precedence level
@@ -133,7 +132,7 @@ noSpaceNameP = P.filter (`notElem` reserved) parseAnyName
       let alphaOrUnderScore = (P.alpha <|> P.char '_')
        in (:) <$> alphaOrUnderScore <*> many (P.digit <|> alphaOrUnderScore)
 
-nameP :: Parser Name 
+nameP :: Parser Name
 nameP = wsP noSpaceNameP
 
 uopP :: Parser Uop
@@ -166,27 +165,29 @@ parameterP = liftA2 (,) nameP (afterP ":" lTypeP)
 parametersP :: Parser [Parameter]
 parametersP = parens $ P.sepBy parameterP (wsP (P.char ','))
 
-lTypeP :: Parser LType 
-lTypeP = liftA2 UnionType baseTypeP (afterP "|" lTypeP)
- <|> liftA2 FunctionType baseTypeP (afterP "->" lTypeP)
- <|> liftA2 TableType (afterP "{" lTypeP) (afterP ":" lTypeP) <* stringP "}"
- <|> baseTypeP
- where 
-  baseTypeP :: Parser LType 
-  baseTypeP = constP "nil" NilType
-    <|> constP "int" IntType 
-    <|> constP "string" StringType 
-    <|> constP "boolean" BooleanType
+lTypeP :: Parser LType
+lTypeP =
+  liftA2 UnionType baseTypeP (afterP "|" lTypeP)
+    <|> liftA2 FunctionType baseTypeP (afterP "->" lTypeP)
+    <|> liftA2 TableType (afterP "{" lTypeP) (afterP ":" lTypeP) <* stringP "}"
+    <|> baseTypeP
+  where
+    baseTypeP :: Parser LType
+    baseTypeP =
+      constP "nil" NilType
+        <|> constP "int" IntType
+        <|> constP "string" StringType
+        <|> constP "boolean" BooleanType
 
-functionValP :: Parser Value 
+functionValP :: Parser Value
 functionValP = liftA3 FunctionVal (afterP "function" parametersP) (afterP ":" lTypeP) blockP <* stringP "end"
 
--- TODO: this currently doesn't allow calling functions straight from tables. 
+-- TODO: this currently doesn't allow calling functions straight from tables.
 callP :: Parser Expression
 callP = liftA2 Call (Name <$> noSpaceNameP) (parens (P.sepBy expP (wsP (P.char ','))))
 
-returnP :: Parser Statement 
-returnP = Return <$> (afterP "return" expP) 
+returnP :: Parser Statement
+returnP = Return <$> (afterP "return" expP)
 
 tableConstP :: Parser Expression
 tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
@@ -199,17 +200,18 @@ tableConstP = TableConst <$> braces (P.sepBy fieldP (wsP (P.char ',')))
         fieldKeyP :: Parser TableField
         fieldKeyP = liftA2 FieldKey (brackets expP) (afterP "=" expP)
 
-statementP :: Parser Statement 
+statementP :: Parser Statement
 statementP = wsP (assignP <|> functionAssignP <|> ifP <|> whileP <|> emptyP <|> repeatP <|> returnP)
   where
     assignP :: Parser Statement
     assignP = Assign <$> typedVarP <*> (stringP "=" *> expP)
-    functionAssignP :: Parser Statement 
-    functionAssignP = liftA2 Assign functionHeaderP (Val <$> unnamedFunctionP) where 
-      unnamedFunctionP :: Parser Value
-      unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
-      functionHeaderP :: Parser TypedVar
-      functionHeaderP = liftA2 (,) (Name <$> afterP "function" nameP) (pure UnknownType)
+    functionAssignP :: Parser Statement
+    functionAssignP = liftA2 Assign functionHeaderP (Val <$> unnamedFunctionP)
+      where
+        unnamedFunctionP :: Parser Value
+        unnamedFunctionP = liftA3 FunctionVal parametersP (afterP ":" lTypeP) blockP <* stringP "end"
+        functionHeaderP :: Parser TypedVar
+        functionHeaderP = liftA2 (,) (Name <$> afterP "function" nameP) (pure UnknownType)
     ifP :: Parser Statement
     ifP = liftA3 If (afterP "if" expP) (afterP "then" blockP) (afterP "else" blockP) <* stringP "end"
     whileP :: Parser Statement

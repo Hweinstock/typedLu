@@ -32,6 +32,7 @@ class ExtendedContext ce where
   exitScope :: ce -> ce
   enterScope :: ce -> ce
 
+-- a -> v Functional dependence.
 class (Eq v) => Environment a v where
   getContext :: a -> Context v
   setContext :: a -> Context v -> a
