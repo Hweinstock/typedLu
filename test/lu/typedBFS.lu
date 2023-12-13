@@ -15,9 +15,9 @@ graph[10] = {[1] = 5}
 graph[11] = {[1] = 7}
 graph[12] = {[1] = 7}
 ;
-tElements : {int : int} = {}
-q = { elements = tElements, first = 0, last = 0}
-q.elements[q.last] = start
+q_elements : {int : int} = {}
+q = {first = 0, last = 0}
+q_elements[q.last] = start
 q.last = q.last + 1
 ;
 visited : {int : boolean} = {}
@@ -25,8 +25,8 @@ visited[start] = true
 found = false
 ;
 repeat 
-  node = q.elements[q.first]
-  q.elements[q.first] = nil
+  node = q_elements[q.first]
+  q_elements[q.first] = -1
   q.first = q.first + 1
   ; 
   visited[node] = true
@@ -38,7 +38,7 @@ repeat
     while i <= # graph[node] do 
       next = graph[node][i]
       if not visited[next] then
-        q.elements[q.last] = next
+        q_elements[q.last] = next
         q.last = q.last + 1
         else
         ;

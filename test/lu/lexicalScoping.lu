@@ -1,17 +1,13 @@
 function foo1(x: int, y: int) : int 
-    --z = x + y 
     function foo2(w : int) : int 
         return w + y
     end 
     return foo2 
-    -- return foo2(z)
 end 
 
 function call(y : int, f2: int -> int) : int 
     return f2(4)
 end
-
-
 
 f2 = foo1(1, 2)
 
