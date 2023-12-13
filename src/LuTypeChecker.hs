@@ -218,12 +218,14 @@ doTypeAssignment (Proj tExp kExp) vExpType exp = do
     _ -> return ()
 
 -- | Check if accessing key with given type and expecting given type is valid for given table.
-typecheckTableAccess :: (MonadError String m) => LType -> LType -> LType -> m ()
+typecheckTableAccess :: (MonadState TypeEnv m, MonadError String m) => LType -> LType -> LType -> m ()
 typecheckTableAccess t@(TableType kType vType) givenKType givenVType =
   if givenKType <: kType && givenVType <: vType
     then return ()
     else throwError (formatError "TableAccess" t (TableType givenKType givenVType))
-typecheckTableAccess t _ _ = throwError (formatError "NonTableAccess" (TableType AnyType AnyType) t)
+typecheckTableAccess t _ _ = do
+  env <- State.get
+  throwError (formatError "NonTableAccess" (TableType AnyType AnyType) t)
 
 -- | Typecheck function body with current state, but don't allow it to affect current state.
 preCheckFuncBody :: (MonadError String m, MonadState TypeEnv m) => Reference -> [Parameter] -> LType -> Block -> m ()
@@ -272,7 +274,7 @@ synthOp2Poly op e1 e2 = do
   sameType <- checkSameType e1 e2
   t1 <- synthesis e1
   t2 <- synthesis e2
-  if sameType then synthOp2 op e1 e2 else throwError (formatError "PolyOp2" t1 t2)
+  if sameType && isBaseType t1 && isBaseType t2 then synthOp2 op e1 e2 else throwError (formatError "PolyOp2" t1 t2)
 
 typeCheckFuncBody :: (MonadError String m, MonadState TypeEnv m) => Reference -> m ()
 typeCheckFuncBody ref = do
