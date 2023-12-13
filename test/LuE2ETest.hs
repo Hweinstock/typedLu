@@ -79,19 +79,19 @@ checkVarValuesInStore :: [(String, Value)] -> EvalEnv -> Bool
 checkVarValuesInStore valuePairs env = all (\(n, v) -> checkVarValueInStore n v env) valuePairs
 
 -- Run Typechecker and print the result.
-seeTypeStore :: String -> IO ()
-seeTypeStore fp = do
+seeTypeEnv :: String -> IO ()
+seeTypeEnv fp = do
   (r :: Either String TypeEnv) <- runFileForStore fp
   case r of
-    Left l -> print l
-    Right r -> print r
+    Left l -> putStrLn ("Error: \n" ++ show r)
+    Right r -> putStrLn ("Successfully type-checked with store: \n" ++ show r)
 
-seeEvalStore :: String -> IO ()
-seeEvalStore fp = do
+seeEvalEnv :: String -> IO ()
+seeEvalEnv fp = do
   (r :: Either String EvalEnv) <- runFileForStore fp
   case r of
-    Left l -> print l
-    Right r -> print r
+    Left l -> putStrLn ("Error: " ++ show r)
+    Right r -> putStrLn ("Successfully evaluated with store: " ++ show r)
 
 test_if :: Test
 test_if =
