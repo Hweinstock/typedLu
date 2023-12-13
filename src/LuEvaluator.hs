@@ -1,6 +1,6 @@
 module LuEvaluator where
 
-import Context (Context, Environment, ExtendedContext, Reference (GlobalRef, LocalRef, TableRef))
+import Context (Context, Environment, Reference (GlobalRef, LocalRef, TableRef))
 import Context qualified as C
 import Control.Monad (when)
 import Control.Monad.State (MonadState (get, put), StateT (runStateT))
@@ -24,17 +24,10 @@ data EvalEnv = EvalEnv
   }
   deriving (Show)
 
-instance ExtendedContext EvalEnv where
-  emptyContext :: EvalEnv
-  emptyContext = EvalEnv {context = C.emptyContext, tableMap = Map.empty}
-
-  exitScope :: EvalEnv -> EvalEnv
-  exitScope env = env {context = C.exitScope (context env)}
-
-  enterScope :: EvalEnv -> EvalEnv
-  enterScope env = env {context = C.enterScope (context env)}
-
 instance Environment EvalEnv Value where
+  emptyEnv :: EvalEnv
+  emptyEnv = EvalEnv {context = C.emptyContext, tableMap = Map.empty}
+
   getContext :: EvalEnv -> Context Value
   getContext = context
 
@@ -70,8 +63,6 @@ resolveVar :: (MonadState EvalEnv m) => Var -> m (Maybe Reference)
 resolveVar (Name n) = do
   (r, v :: Value) <- C.resolveName n
   return $ Just r
-
--- Just . fst <$> C.resolveName n
 resolveVar (Dot exp n) = do
   e <- evalE exp
   return $ case e of
@@ -92,17 +83,12 @@ toStore env = Map.insert globalTableName (C.gMap (context env)) (tableMap env)
 -- | Helper function to convert Store to evaluation environment (for testing and debugging)
 fromStore :: Store -> EvalEnv
 fromStore s = case Map.lookup globalTableName s of
-  Nothing -> C.emptyContext -- Shouldn't hit this cae.
+  Nothing -> C.emptyEnv -- Shouldn't hit this cae.
   Just globalTable -> newEnv
     where
-      newEnv =
-        let initEnv = C.emptyContext
-         in (C.setGMap globalTable initEnv) {tableMap = newTables}
+      newEnv = (C.setGMap globalTable C.emptyEnv) {tableMap = newTables}
         where
           newTables = Map.filterWithKey (\k _ -> k /= globalTableName) s
-
-instance PP EvalEnv where
-  pp env = undefined
 
 globalTableName :: Name
 globalTableName = "_G"

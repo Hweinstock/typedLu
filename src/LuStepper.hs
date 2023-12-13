@@ -71,7 +71,7 @@ initialStepper =
   Stepper
     { filename = Nothing,
       block = mempty,
-      env = C.emptyContext,
+      env = C.emptyEnv,
       history = Nothing
     }
 
@@ -120,7 +120,7 @@ stepper = go initialStepper
               go (ss {filename = Just fn, block = b})
         -- dump the store
         Just (":d", _) -> do
-          putStrLn (pretty (env ss))
+          putStrLn (show (env ss))
           go ss
         -- quit the stepper
         Just (":q", _) -> return ()

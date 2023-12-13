@@ -1,6 +1,8 @@
+{-# LANGUAGE FunctionalDependencies #-}
+
 module LuE2ETest where
 
-import Context (Context, ExtendedContext, Reference (GlobalRef))
+import Context (Context, Environment, Reference (GlobalRef))
 import Context qualified as C
 import Control.Monad.State qualified as State
 import Data.Either (isLeft)
@@ -14,7 +16,7 @@ import LuTypeChecker (TypeEnv, execEnv, getUncalledFunc, typeCheckAST)
 import LuTypes
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 
-class (ExtendedContext env) => TestableEnvironment env where
+class (Environment env v) => TestableEnvironment env v | env -> v where
   execBlock :: Block -> env -> Either String env
 
   runFileForStore :: String -> IO (Either String env)
@@ -22,7 +24,7 @@ class (ExtendedContext env) => TestableEnvironment env where
     parseResult <- parseLuFile fp
     return $ case parseResult of
       (Left _) -> Left "Failed to parse file"
-      (Right ast) -> execBlock ast C.emptyContext
+      (Right ast) -> execBlock ast C.emptyEnv
 
   checkOutputStore :: String -> (env -> Bool) -> IO Bool
   checkOutputStore fp checkFn = do
@@ -34,11 +36,11 @@ class (ExtendedContext env) => TestableEnvironment env where
   testFile :: String -> (env -> Bool) -> IO Assertion
   testFile fp checkFn = assert <$> checkOutputStore fp checkFn
 
-instance TestableEnvironment EvalEnv where
+instance TestableEnvironment EvalEnv Value where
   execBlock :: Block -> EvalEnv -> Either String EvalEnv
   execBlock = exec
 
-instance TestableEnvironment TypeEnv where
+instance TestableEnvironment TypeEnv LType where
   execBlock :: Block -> TypeEnv -> Either String TypeEnv
   execBlock = execEnv
 
