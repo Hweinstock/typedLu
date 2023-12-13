@@ -6,11 +6,15 @@ import LuEvaluatorTest qualified as LE
 import LuParserTest qualified as LP
 import LuStepperTest qualified as LS
 import LuTypeCheckerTest qualified as LTC
+import StackTest qualified as STK
 import Test.HUnit
 import Test.QuickCheck
 
 main :: IO ()
 main = do
+  putStrLn "\n*** Testing Stack ***"
+  STK.test
+  STK.qc
   putStrLn "\n*** Testing LuParser ***"
   LP.test
   LP.qc
