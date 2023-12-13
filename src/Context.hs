@@ -72,7 +72,7 @@ class (Eq v) => Environment env v | env -> v where
       Just v -> v
       _ -> d
   indexWithDefault (TableRef tname tkey) d = indexTable (tname, tkey) d
-
+  
   update :: (MonadState env m) => Reference -> v -> m ()
   update (GlobalRef n) v = State.modify (addGlobal (n, v) :: env -> env)
   update (LocalRef n) v = State.modify (addLocal (n, v))
@@ -91,6 +91,7 @@ class (Eq v) => Environment env v | env -> v where
     let c = getContext env
      in setContext env (c {gMap = Map.insert (StringVal k) v (gMap c)})
 
+
   getGlobal :: Name -> env -> Maybe v
   getGlobal n env = Map.lookup (StringVal n) ((gMap . getContext) env)
 
@@ -104,7 +105,7 @@ class (Eq v) => Environment env v | env -> v where
   setGMap m env =
     let c = getContext env
      in setContext env (c {gMap = m})
-
+     
   resolveNameWithUnknown :: (MonadState env m) => v -> Name -> m (Reference, v)
   resolveNameWithUnknown unknown n = do
     localResolve <- index (LocalRef n)

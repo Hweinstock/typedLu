@@ -63,6 +63,7 @@ resolveVar :: (MonadState EvalEnv m) => Var -> m (Maybe Reference)
 resolveVar (Name n) = do
   (r, v :: Value) <- C.resolveName n
   return $ Just r
+
 resolveVar (Dot exp n) = do
   e <- evalE exp
   return $ case e of
