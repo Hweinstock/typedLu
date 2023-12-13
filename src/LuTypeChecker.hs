@@ -60,6 +60,9 @@ updateRef ref t exp = do
     (FunctionType _ _, Val f@(FunctionVal pms rt b)) -> preCheckFuncBody ref pms rt b
     _ -> return ()
 
+formatError :: String -> LType -> LType -> String
+formatError code expected actual = code ++ ": expected type [" ++ show expected ++ "] got type [" ++ show actual ++ "]"
+
 class Synthable a where
   synth :: (MonadError String m, MonadState TypeEnv m) => a -> m LType
 
@@ -103,14 +106,14 @@ instance Synthable Var where
     expType <- synthesis exp
     case expType of
       t@(TableType t1 t2) -> typecheckTableAccess t StringType Never >> return t2
-      _ -> throwError "Cannot access non table type via dot method"
+      _ -> throwError (formatError "TableAccess" (TableType StringType AnyType) expType)
   synth (Proj tExp kExp) = do
     tableType <- synthesis tExp
     keyType <- synthesis kExp
     typecheckTableAccess tableType keyType Never
     case tableType of
       TableType t1 t2 -> return t2
-      _ -> throwError "Cannot access not table type via proj method."
+      _ -> throwError (formatError "TableAccess" (TableType keyType AnyType) tableType)
 
 instance Synthable [TableField] where
   synth tfs = do
@@ -142,7 +145,7 @@ instance Synthable (Statement, LType) where
     actualType <- synthesis exp
     if sameType
       then return actualType
-      else throwError "return type mismatch"
+      else throwError (formatError "StatementReturn" expectedReturnType actualType)
 
 instance Synthable (Block, LType) where
   -- \| Given a block, an environment, and an expected return type, return the type returned by the block.
@@ -156,7 +159,7 @@ instance Synthable (Block, LType) where
         actualType <- synthesis exp
         if sameType
           then return actualType
-          else throwError "BlockType mismatch"
+          else throwError (formatError "BlockReturn" expectedReturnType actualType)
       _ -> synth (Block ss, expectedReturnType)
   synth (Block [], expectedReturnType) = return NilType
 
@@ -185,13 +188,14 @@ typeCheckConditionalBlocks exp expectedReturnType bs errorStr = do
     else throwError errorStr
 
 typeCheckAssign :: (MonadError String m, MonadState TypeEnv m) => Var -> LType -> Expression -> m LType
-typeCheckAssign v UnknownType exp = throwError ("Can not determine type of [" ++ pretty exp ++ "]")
+typeCheckAssign v UnknownType exp = throwError ("Failed to determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do
   res <- doTypeAssignment v t exp -- Do type assignment first, in case definition is recursive.
   sameType <- checker (Var v) t -- Check that variable updates to target type in case table key/value type changes.
+  actualType <- synthesis (Var v)
   if sameType
     then return NilType
-    else throwError "AssignmentError"
+    else throwError (formatError "AssignmentError" t actualType)
 
 -- Given var, its determined type, and
 doTypeAssignment :: (MonadError String m, MonadState TypeEnv m) => Var -> LType -> Expression -> m ()
@@ -199,7 +203,7 @@ doTypeAssignment (Name n) tExpType exp = do
   (ref, curType :: LType) <- C.resolveName n
   if curType == NilType || curType == tExpType
     then updateRef ref tExpType exp
-    else throwError "Cannot redefine variable to new type"
+    else throwError (formatError "Reassign" curType tExpType)
 doTypeAssignment (Dot tExp n) vExpType exp = do
   tableType <- synthesis tExp
   typecheckTableAccess tableType StringType vExpType
@@ -215,11 +219,11 @@ doTypeAssignment (Proj tExp kExp) vExpType exp = do
 
 -- | Check if accessing key with given type and expecting given type is valid for given table.
 typecheckTableAccess :: (MonadError String m) => LType -> LType -> LType -> m ()
-typecheckTableAccess (TableType kType vType) givenKType givenVType =
+typecheckTableAccess t@(TableType kType vType) givenKType givenVType =
   if givenKType <: kType && givenVType <: vType
     then return ()
-    else throwError "Table type sealed"
-typecheckTableAccess _ _ _ = throwError "Unable to access value from non-table"
+    else throwError (formatError "TableAccess" t (TableType givenKType givenVType))
+typecheckTableAccess t _ _ = throwError (formatError "NonTableAccess" (TableType AnyType AnyType) t)
 
 -- | Typecheck function body with current state, but don't allow it to affect current state.
 preCheckFuncBody :: (MonadError String m, MonadState TypeEnv m) => Reference -> [Parameter] -> LType -> Block -> m ()
@@ -231,7 +235,7 @@ preCheckFuncBody ref pms rt b = do
   blockType <- State.evalStateT (synth (b, rt)) s
   if blockType <: rt
     then return ()
-    else throwError $ "Expected block to return type " ++ show rt ++ " got type " ++ show blockType ++ " in body " ++ show b
+    else throwError (formatError "PrecheckFuncReturn" rt blockType)
 
 -- | update key and value types associated with table in env.
 updateTableType :: (MonadError String m, MonadState TypeEnv m) => Name -> LType -> LType -> LType -> m ()
@@ -241,7 +245,7 @@ updateTableType tableName (TableType kTypeOld vTypeOld) kTypeNew vTypeNew = do
   (ref, _ :: LType) <- C.resolveName tableName
   C.update ref (TableType kType vType)
   return ()
-updateTableType _ _ _ _ = throwError "Cannot update non table."
+updateTableType _ t _ _ = throwError (formatError "TableUpdate" (TableType AnyType AnyType) t)
 
 checkSameType :: (MonadError String m, MonadState TypeEnv m) => Expression -> Expression -> m Bool
 checkSameType e1 e2 = do
@@ -254,7 +258,8 @@ synthCall (FunctionType Never returnType) [] = return returnType
 synthCall (FunctionType paramType returnType) (p : ps) = do
   let nextFunction = if null ps then FunctionType Never returnType else returnType
   sameType <- checker p paramType
-  if sameType then synthCall nextFunction ps else throwError "Parameter Assignment"
+  actualType <- synthesis p
+  if sameType then synthCall nextFunction ps else throwError (formatError "ParameterAssignment" paramType actualType)
 synthCall t _ = throwError ("CallNonFunc: Cannot call type [" ++ show t ++ "]")
 
 synthOp2 :: (MonadError String m, MonadState TypeEnv m) => Bop -> Expression -> Expression -> m LType
@@ -265,7 +270,9 @@ synthOp2 op e1 e2 = do
 synthOp2Poly :: (MonadError String m, MonadState TypeEnv m) => Bop -> Expression -> Expression -> m LType
 synthOp2Poly op e1 e2 = do
   sameType <- checkSameType e1 e2
-  if sameType then synthOp2 op e1 e2 else throwError "Recieved two different types in Op2 execution."
+  t1 <- synthesis e1
+  t2 <- synthesis e2
+  if sameType then synthOp2 op e1 e2 else throwError (formatError "PolyOp2" t1 t2)
 
 typeCheckFuncBody :: (MonadError String m, MonadState TypeEnv m) => Reference -> m ()
 typeCheckFuncBody ref = do
@@ -279,7 +286,7 @@ typeCheckFuncBody ref = do
       State.modify C.exitScope
       if blockType <: rt
         then return ()
-        else throwError $ "Return: expected type " ++ show rt ++ " but got type " ++ show blockType
+        else throwError (formatError "Return" rt blockType)
     _ -> return ()
 
 isPolymorphicBop :: Bop -> Bool
