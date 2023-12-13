@@ -132,9 +132,7 @@ instance Synthable [TableField] where
 instance Synthable (Statement, LType) where
   -- \| Given a statement, an environment and an expected return type, check if the types are consistent in the statement.
   synth :: (MonadError String m, MonadState TypeEnv m) => (Statement, LType) -> m LType
-  synth (Assign (v, UnknownType) exp, expectedReturnType) = do
-    expType <- synthesis exp
-    typeCheckAssign v expType exp
+  synth (Assign (v, UnknownType) exp, expectedReturnType) = synthesis exp >>= \expType -> typeCheckAssign v expType exp
   synth (Assign (v, t) exp, expectedReturnType) = typeCheckAssign v t exp
   synth (If exp b1 b2, expectedReturnType) = typeCheckConditionalBlocks exp expectedReturnType [b1, b2] "Non-boolean in if condition"
   synth (While exp b, expectedReturnType) = typeCheckConditionalBlocks exp expectedReturnType [b] "Non-boolean in while condition"
@@ -191,17 +189,17 @@ typeCheckAssign :: (MonadError String m, MonadState TypeEnv m) => Var -> LType -
 typeCheckAssign v UnknownType exp = throwError ("Failed to determine type of [" ++ pretty exp ++ "]")
 typeCheckAssign v t exp = do
   res <- doTypeAssignment v t exp -- Do type assignment first, in case definition is recursive.
-  sameType <- checker (Var v) t -- Check that variable updates to target type in case table key/value type changes.
-  actualType <- synthesis (Var v)
-  if sameType
+  varType <- synthesis (Var v)
+
+  if t <: varType
     then return NilType
-    else throwError (formatError "AssignmentError" t actualType)
+    else throwError (formatError "AssignmentError" varType t)
 
 -- Given var, its determined type, and
 doTypeAssignment :: (MonadError String m, MonadState TypeEnv m) => Var -> LType -> Expression -> m ()
 doTypeAssignment (Name n) tExpType exp = do
   (ref, curType :: LType) <- C.resolveName n
-  if curType == NilType || curType == tExpType
+  if curType == NilType || curType == tExpType || tExpType <: curType
     then updateRef ref tExpType exp
     else throwError (formatError "Reassign" curType tExpType)
 doTypeAssignment (Dot tExp n) vExpType exp = do
