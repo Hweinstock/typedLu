@@ -167,7 +167,8 @@ test_typeCheck =
         "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False,
         "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True,
         "redefine" ~: testTypeCheckFile "test/lu/redefine.lu" False,
-        "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True
+        "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True,
+        "typedBFS" ~: testTypeCheckFile "test/lu/typedBFS.lu" True
       ]
 
 test_typeCheckStore :: Test
