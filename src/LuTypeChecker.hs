@@ -197,11 +197,14 @@ typeCheckAssign v t exp = do
 
 -- Given var, its determined type, and
 doTypeAssignment :: (MonadError String m, MonadState TypeEnv m) => Var -> LType -> Expression -> m ()
-doTypeAssignment (Name n) tExpType exp = do
+doTypeAssignment (Name n) newType exp = do
   (ref, curType :: LType) <- C.resolveName n
-  if curType == NilType || curType == tExpType || tExpType <: curType
-    then updateRef ref tExpType exp
-    else throwError (formatError "Reassign" curType tExpType)
+  if curType == NilType
+    then updateRef ref newType exp
+    else
+      if newType <: curType
+        then return ()
+        else throwError (formatError "Reassign" curType newType)
 doTypeAssignment (Dot tExp n) vExpType exp = do
   tableType <- synthesis tExp
   typecheckTableAccess tableType StringType vExpType

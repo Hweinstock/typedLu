@@ -169,7 +169,8 @@ test_typeCheck =
         "redefine" ~: testTypeCheckFile "test/lu/redefine.lu" False,
         "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True,
         "typedBFS" ~: testTypeCheckFile "test/lu/typedBFS.lu" True,
-        "typedTable" ~: testTypeCheckFile "test/lu/typedTable.lu" True
+        "typedTable" ~: testTypeCheckFile "test/lu/typedTable.lu" True,
+        "redefineOk" ~: testTypeCheckFile "test/lu/redefineOk.lu" True
       ]
 
 test_typeCheckStore :: Test
