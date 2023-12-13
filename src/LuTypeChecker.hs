@@ -1,6 +1,6 @@
 module LuTypeChecker where
 
-import Context (Context, Environment, ExtendedContext, Reference (GlobalRef, LocalRef, TableRef))
+import Context (Context, Environment, Reference (GlobalRef, LocalRef, TableRef), emptyContext)
 import Context qualified as C
 import Control.Monad
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExcept, runExceptT)
@@ -19,17 +19,10 @@ data TypeEnv = TypeEnv
   }
   deriving (Show)
 
-instance ExtendedContext TypeEnv where
-  emptyContext :: TypeEnv
-  emptyContext = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
-
-  enterScope :: TypeEnv -> TypeEnv
-  enterScope env = env {context = C.enterScope (context env)}
-
-  exitScope :: TypeEnv -> TypeEnv
-  exitScope env = env {context = C.exitScope (context env)}
-
 instance Environment TypeEnv LType where
+  emptyEnv :: TypeEnv
+  emptyEnv = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
+
   getContext :: TypeEnv -> Context LType
   getContext = context
 
@@ -49,9 +42,6 @@ instance Environment TypeEnv LType where
 
   resolveName :: (MonadState TypeEnv m) => Name -> m (Reference, LType)
   resolveName = C.resolveNameWithUnknown UnknownType
-
-emptyTypeEnv :: TypeEnv
-emptyTypeEnv = TypeEnv {context = C.emptyContext, uncalledFuncs = Map.empty}
 
 addUncalledFunc :: Reference -> Value -> TypeEnv -> TypeEnv
 addUncalledFunc ref v env = env {uncalledFuncs = Map.insert ref v (uncalledFuncs env)}

@@ -10,7 +10,7 @@ import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 
 store :: TypeEnv
-store = C.setGMap typeMap emptyTypeEnv
+store = C.setGMap typeMap C.emptyEnv
   where
     typeMap =
       Map.fromList
@@ -283,29 +283,29 @@ test_typeCheckStatement :: Test
 test_typeCheckStatement =
   "typechecking statement" ~:
     TestList
-      [ evalType (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) emptyTypeEnv ~?= Right NilType,
-        evalType (Return (Val (StringVal "foo"))) emptyTypeEnv ~?= Right StringType,
-        evalType (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])) emptyTypeEnv ~?= Right StringType
+      [ evalType (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) C.emptyEnv ~?= Right NilType,
+        evalType (Return (Val (StringVal "foo"))) C.emptyEnv ~?= Right StringType,
+        evalType (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])) C.emptyEnv ~?= Right StringType
       ]
 
 test_typeCheckBlock :: Test
 test_typeCheckBlock =
   "typechecking block" ~:
     TestList
-      [ evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])]) emptyTypeEnv ~?= Right StringType,
-        evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])]) emptyTypeEnv ~?= Right (UnionType StringType IntType),
-        evalType (Block [Return (Val (StringVal "foo"))]) emptyTypeEnv ~?= Right StringType,
-        evalType (Block [Return (Val (IntVal 5))]) emptyTypeEnv ~?= Right IntType,
-        evalType (Block []) emptyTypeEnv ~?= Right NilType
+      [ evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])]) C.emptyEnv ~?= Right StringType,
+        evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])]) C.emptyEnv ~?= Right (UnionType StringType IntType),
+        evalType (Block [Return (Val (StringVal "foo"))]) C.emptyEnv ~?= Right StringType,
+        evalType (Block [Return (Val (IntVal 5))]) C.emptyEnv ~?= Right IntType,
+        evalType (Block []) C.emptyEnv ~?= Right NilType
       ]
 
 test_typeCheckBlocks :: Test
 test_typeCheckBlocks =
   "typehecking multiple Blocks" ~:
     TestList
-      [ typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (StringVal "foo"))], Block [Return (Val (StringVal "not foo"))]] ~?= Right StringType,
-        typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (IntVal 5))], Block [Return (Val (StringVal "not foo"))]] ~?= Right (UnionType StringType IntType),
-        typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (IntVal 5))], Block []] ~?= Right (UnionType StringType NilType)
+      [ typeCheckBlocks C.emptyEnv StringType [Block [Return (Val (StringVal "foo"))], Block [Return (Val (StringVal "not foo"))]] ~?= Right StringType,
+        typeCheckBlocks C.emptyEnv StringType [Block [Return (Val (IntVal 5))], Block [Return (Val (StringVal "not foo"))]] ~?= Right (UnionType StringType IntType),
+        typeCheckBlocks C.emptyEnv StringType [Block [Return (Val (IntVal 5))], Block []] ~?= Right (UnionType StringType NilType)
       ]
 
 test_uncalledFunc :: Test
@@ -313,10 +313,10 @@ test_uncalledFunc =
   "tracking uncalled funcs" ~:
     TestList
       [ -- Adding func to map should make it accessible.
-        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyContext) (C.GlobalRef "foo") ~?= Just (FunctionVal [] NilType (Block [])),
+        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyEnv) (C.GlobalRef "foo") ~?= Just (FunctionVal [] NilType (Block [])),
         -- only get func that matches name.
-        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo2") (FunctionVal [] NilType (Block [])) C.emptyContext) (C.GlobalRef "foo") ~?= Nothing,
-        getUncalledFunc (removeUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyContext) (C.GlobalRef "foo")) (C.GlobalRef "foo") ~?= Nothing
+        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo2") (FunctionVal [] NilType (Block [])) C.emptyEnv) (C.GlobalRef "foo") ~?= Nothing,
+        getUncalledFunc (removeUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyEnv) (C.GlobalRef "foo")) (C.GlobalRef "foo") ~?= Nothing
       ]
 
 test :: IO Counts

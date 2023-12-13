@@ -1,19 +1,25 @@
+{-# LANGUAGE FunctionalDependencies #-}
+
 module Context where
 
 import Control.Monad.State (MonadState)
 import Control.Monad.State qualified as State
 import Data.Map (Map)
 import Data.Map qualified as Map
-import LuSyntax
+import LuSyntax (Name, Value (StringVal))
 import LuTypes
 import Stack (Stack)
 import Stack qualified
 
+-- Shared Context between evaluator and type-checker.
 data Context a = Context
   { gMap :: Map Value a,
     localStack :: Stack (LocalVar a),
     curDepth :: Int
   }
+
+emptyContext :: Context a
+emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
 
 data Reference
   = GlobalRef Name -- name of global
@@ -27,25 +33,34 @@ data LocalVar a = LocalVar
     depth :: Int
   }
 
-class ExtendedContext ce where
-  emptyContext :: ce
-  exitScope :: ce -> ce
-  enterScope :: ce -> ce
+-- | Define an environment type class that we can implement in TC + Eval.
+-- We can define all the shared functionality of working with the environment here.
+class (Eq v) => Environment env v | env -> v where
+  emptyEnv :: env
+  getContext :: env -> Context v
+  setContext :: env -> Context v -> env
 
--- a -> v Functional dependence.
-class (Eq v) => Environment a v where
-  getContext :: a -> Context v
-  setContext :: a -> Context v -> a
+  index :: (MonadState env m) => Reference -> m v
+  indexTable :: (MonadState env m) => (Name, Value) -> v -> m v
+  updateTable :: (MonadState env m) => (Name, Value) -> v -> m ()
+  resolveName :: (MonadState env m) => Name -> m (Reference, v)
 
-  index :: (MonadState a m) => Reference -> m v
+  exitScope :: env -> env
+  exitScope env =
+    let c = getContext env
+     in setContext env (exitContextScope c)
+    where
+      exitContextScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1}
+        where
+          aboveDepth :: Int -> LocalVar a -> Bool
+          aboveDepth n lv = depth lv < curDepth (getContext env)
 
-  indexTable :: (MonadState a m) => (Name, Value) -> v -> m v
+  enterScope :: env -> env
+  enterScope env =
+    let c = getContext env
+     in setContext env (c {curDepth = curDepth c + 1})
 
-  updateTable :: (MonadState a m) => (Name, Value) -> v -> m ()
-
-  resolveName :: (MonadState a m) => Name -> m (Reference, v)
-
-  indexWithDefault :: (MonadState a m) => Reference -> v -> m v
+  indexWithDefault :: (MonadState env m) => Reference -> v -> m v
   indexWithDefault (GlobalRef n) d = do
     env <- State.get
     return $ case getGlobal n env of
@@ -57,40 +72,41 @@ class (Eq v) => Environment a v where
       Just v -> v
       _ -> d
   indexWithDefault (TableRef tname tkey) d = indexTable (tname, tkey) d
-
-  update :: (MonadState a m) => Reference -> v -> m ()
-  update (GlobalRef n) v = State.modify (addGlobal (n, v) :: a -> a)
+  
+  update :: (MonadState env m) => Reference -> v -> m ()
+  update (GlobalRef n) v = State.modify (addGlobal (n, v) :: env -> env)
   update (LocalRef n) v = State.modify (addLocal (n, v))
   update (TableRef n k) v = updateTable (n, k) v
 
   -- Internal method.
-  addLocal :: (Name, v) -> a -> a
+  addLocal :: (Name, v) -> env -> env
   addLocal (n, v) env =
     let c = getContext env
      in let lv = LocalVar {val = v, name = n, depth = curDepth c}
          in setContext env (c {localStack = Stack.push (localStack c) lv})
 
   -- Internal method.
-  addGlobal :: (Name, v) -> a -> a
+  addGlobal :: (Name, v) -> env -> env
   addGlobal (k, v) env =
     let c = getContext env
      in setContext env (c {gMap = Map.insert (StringVal k) v (gMap c)})
 
-  getGlobal :: Name -> a -> Maybe v
+
+  getGlobal :: Name -> env -> Maybe v
   getGlobal n env = Map.lookup (StringVal n) ((gMap . getContext) env)
 
-  getLocal :: Name -> a -> Maybe v
+  getLocal :: Name -> env -> Maybe v
   getLocal n env = case Stack.peekUntil ((localStack . getContext) env) (\lv -> name lv == n) of
     Just lv -> Just $ val lv
     _ -> Nothing
 
   -- Set global map, useful for testing and initialization.
-  setGMap :: Map Value v -> a -> a
+  setGMap :: Map Value v -> env -> env
   setGMap m env =
     let c = getContext env
      in setContext env (c {gMap = m})
-
-  resolveNameWithUnknown :: (MonadState a m) => v -> Name -> m (Reference, v)
+     
+  resolveNameWithUnknown :: (MonadState env m) => v -> Name -> m (Reference, v)
   resolveNameWithUnknown unknown n = do
     localResolve <- index (LocalRef n)
     globalResolve <- index (GlobalRef n)
@@ -98,26 +114,11 @@ class (Eq v) => Environment a v where
       then return (GlobalRef n, globalResolve)
       else return (LocalRef n, localResolve)
 
-  prepareFunctionEnv :: (MonadState a m) => [(Name, v)] -> m ()
+  prepareFunctionEnv :: (MonadState env m) => [(Name, v)] -> m ()
   prepareFunctionEnv params = do
-    let getThisContext = getContext :: a -> Context v
-    State.modify (\env -> setContext env (enterScope (getThisContext env)))
+    let getThisContext = getContext :: env -> Context v
+    State.modify enterScope
     State.modify (\e -> foldr addLocal e params)
-
-instance ExtendedContext (Context a) where
-  emptyContext :: Context a
-  emptyContext = Context {gMap = Map.empty, localStack = Stack.empty, curDepth = 0}
-
-  -- \| Decrease depth of scope and remove variables at this level.
-  exitScope :: Context a -> Context a
-  exitScope c = c {localStack = Stack.popUntil (localStack c) (aboveDepth (curDepth c)), curDepth = curDepth c - 1}
-    where
-      aboveDepth :: Int -> LocalVar a -> Bool
-      aboveDepth n lv = depth lv < curDepth c
-
-  -- \| Increase depth of scope.
-  enterScope :: Context a -> Context a
-  enterScope c = c {curDepth = curDepth c + 1}
 
 instance (Show a) => Show (LocalVar a) where
   show :: LocalVar a -> String
