@@ -1,0 +1,7 @@
+t : {string : int} = {}
+t["x"] = 5
+
+t2: {boolean : int} = {} 
+t2[true] = 3
+
+result = t["x"] + t2[true]

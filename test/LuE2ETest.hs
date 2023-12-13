@@ -1,7 +1,8 @@
 module LuE2ETest where
 
-import Context (Context, ExtendedContext)
+import Context (Context, ExtendedContext, Reference (GlobalRef))
 import Context qualified as C
+import Control.Monad.State qualified as State
 import Data.Either (isLeft)
 import Data.Map qualified as Map
 import Data.Maybe (isJust)
@@ -9,9 +10,8 @@ import LuEvaluator (EvalEnv, Store, errorCodeName, eval, exec, globalTableName, 
 import LuEvaluatorTest (initialEnv)
 import LuParser (parseLuFile)
 import LuSyntax
-import LuTypeChecker (TypeEnv, getUncalledFunc, runForEnv, typeCheckAST)
+import LuTypeChecker (TypeEnv, execEnv, getUncalledFunc, typeCheckAST)
 import LuTypes
-import State qualified as S
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 
 class (ExtendedContext env) => TestableEnvironment env where
@@ -40,7 +40,7 @@ instance TestableEnvironment EvalEnv where
 
 instance TestableEnvironment TypeEnv where
   execBlock :: Block -> TypeEnv -> Either String TypeEnv
-  execBlock = runForEnv
+  execBlock = execEnv
 
 testTypeCheckFile :: String -> Bool -> IO Assertion
 testTypeCheckFile fp expected = do
@@ -62,7 +62,7 @@ testIOResult b = b >>= assert
 
 -- | Check property of variable in env.
 checkVarProperty :: String -> (Value -> Bool) -> EvalEnv -> Bool
-checkVarProperty targetName property env = property $ S.evalState (C.lookup targetName) env
+checkVarProperty targetName property env = property $ snd $ State.evalState (C.resolveName targetName) env
 
 -- | Check if variable holds target value in store.
 checkVarValueInStore :: String -> Value -> EvalEnv -> Bool
@@ -163,7 +163,9 @@ test_typeCheck =
         "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" True,
         "unionReturn2" ~: testTypeCheckFile "test/lu/unionReturn2.lu" True,
         "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False,
-        "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True
+        "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True,
+        "redefine" ~: testTypeCheckFile "test/lu/redefine.lu" False,
+        "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True
       ]
 
 test_typeCheckStore :: Test
@@ -176,12 +178,12 @@ test_typeCheckStore =
       ]
   where
     containsFunc :: Name -> TypeEnv -> Bool
-    containsFunc n env = isJust $ getUncalledFunc env n
+    containsFunc n env = isJust $ getUncalledFunc env (GlobalRef n)
 
     isNilOrUndefined :: Name -> Bool -> TypeEnv -> Bool
     isNilOrUndefined n expected env = expected == (actual == NilType || actual == UnknownType)
       where
-        actual = S.evalState (C.lookup n) env
+        actual = snd $ State.evalState (C.resolveName n) env
 
 test_error :: Test
 test_error =

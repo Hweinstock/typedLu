@@ -1,15 +1,14 @@
-module LuStepperTest where 
+module LuStepperTest where
 
-import LuSyntax
-import LuStepper
-import LuEvaluator (EvalEnv, globalTableName, execWithoutError, toStore, Store, fromStore)
-import LuEvaluatorTest (initialEnv, extendedEnv)
-import State (State)
-import State qualified as S
+import Control.Monad.State qualified as State
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
-import Test.QuickCheck qualified as QC
+import LuEvaluator (EvalEnv, Store, execWithoutError, fromStore, globalTableName, toStore)
+import LuEvaluatorTest (extendedEnv, initialEnv)
+import LuStepper
+import LuSyntax
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
+import Test.QuickCheck qualified as QC
 
 -- | test.lu:  arithemetic and while loops
 tExecStepTest :: Test
@@ -83,15 +82,14 @@ tExecStepBfs =
       Just g -> g
       Nothing -> Map.empty
 
-test_step_with_errors :: Test 
-test_step_with_errors = 
-  "exec with errors" ~: 
-    TestList 
-      [
-        toStore (execWithoutError b initialEnv) ~?= toStore (S.execState (boundedStep 100 b) initialEnv)
+test_step_with_errors :: Test
+test_step_with_errors =
+  "exec with errors" ~:
+    TestList
+      [ toStore (execWithoutError b initialEnv) ~?= toStore (State.execState (boundedStep 100 b) initialEnv)
       ]
-      where 
-          b = Block [If (Op1 Neg (Var (Name "x"))) (Block []) (Block []),If (TableConst []) (Block []) (Block [])]
+  where
+    b = Block [If (Op1 Neg (Var (Name "x"))) (Block []) (Block []), If (TableConst []) (Block []) (Block [])]
 
 test :: IO Counts
 test = runTestTT $ TestList [test_step_with_errors, tExecStepFact, tExecStepAbs, tExecStepTimes, tExecStepAbs, tExecStepTable, tExecStepBfs]
@@ -100,17 +98,17 @@ prop_stepExec :: Block -> QC.Property
 prop_stepExec b =
   not (final b) QC.==> final b1 QC.==> toStore m1 == toStore m2
   where
-    (b1, m1) = S.runState (boundedStep 100 b) initialEnv
+    (b1, m1) = State.runState (boundedStep 100 b) initialEnv
     m2 = execWithoutError b initialEnv
 
 -- | Make sure that we can step every block in every store
 prop_step_total :: Block -> Store -> Bool
-prop_step_total b s = case S.runState (step b) (fromStore s) of
+prop_step_total b s = case State.runState (step b) (fromStore s) of
   (b', s') -> True
 
-qc :: IO () 
-qc = do 
-    putStrLn "stepExec"
-    quickCheckN 100 prop_stepExec
-    putStrLn "step_total"
-    quickCheckN 100 prop_step_total
+qc :: IO ()
+qc = do
+  putStrLn "stepExec"
+  quickCheckN 100 prop_stepExec
+  putStrLn "step_total"
+  quickCheckN 100 prop_step_total

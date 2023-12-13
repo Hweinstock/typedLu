@@ -1,34 +1,36 @@
-module LuEvaluatorTest where 
+module LuEvaluatorTest where
 
-import LuSyntax
-import LuEvaluator
-import State qualified as S
-import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
-import Data.Map (Map, (!?))
-import Data.Map qualified as Map
-import Test.QuickCheck qualified as QC
 import Context (Context, Reference (GlobalRef, LocalRef, TableRef))
 import Context qualified as C
+import Control.Monad.State qualified as State
+import Data.Map (Map, (!?))
+import Data.Map qualified as Map
+import LuEvaluator
+import LuSyntax
+import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
+import Test.QuickCheck qualified as QC
 
 initialEnv :: EvalEnv
 initialEnv = fromStore $ Map.singleton globalTableName Map.empty
 
 extendedEnv :: EvalEnv
-extendedEnv = fromStore m where 
-  m = Map.fromList
-    [ ( globalTableName,
-        Map.fromList
-          [ (StringVal "x", IntVal 3),
-            (StringVal "t", TableVal "_t0")
-          ]
-      ),
-      ( "_t0",
-        Map.fromList
-          [ (StringVal "y", BoolVal True),
-            (IntVal 2, TableVal "_t0")
-          ]
-      )
-    ]
+extendedEnv = fromStore m
+  where
+    m =
+      Map.fromList
+        [ ( globalTableName,
+            Map.fromList
+              [ (StringVal "x", IntVal 3),
+                (StringVal "t", TableVal "_t0")
+              ]
+          ),
+          ( "_t0",
+            Map.fromList
+              [ (StringVal "y", BoolVal True),
+                (IntVal 2, TableVal "_t0")
+              ]
+          )
+        ]
 
 xref :: Reference
 xref = GlobalRef "x"
@@ -41,17 +43,17 @@ test_index =
   "index tests" ~:
     TestList
       [ -- The global variable "x" is unitialized (i.e. not present in the initial store)
-        S.evalState (C.index xref) initialEnv ~?= NilVal,
+        State.evalState (C.index xref) initialEnv ~?= NilVal,
         -- But there is a value for "x" available in the extended store
-        S.evalState (C.index xref) extendedEnv ~?= IntVal 3,
+        State.evalState (C.index xref) extendedEnv ~?= IntVal 3,
         -- If a table name is not found in the store, accessing its reference also returns nil.
-        S.evalState (C.index yref) initialEnv ~?= NilVal,
+        State.evalState (C.index yref) initialEnv ~?= NilVal,
         -- We should also be able to access "t[1]" in the extended store
-        S.evalState (C.index yref) extendedEnv ~?= BoolVal True,
-        S.evalState (C.index (TableRef "z" NilVal)) extendedEnv ~?= NilVal,
+        State.evalState (C.index yref) extendedEnv ~?= BoolVal True,
+        State.evalState (C.index (TableRef "z" NilVal)) extendedEnv ~?= NilVal,
         -- Updates using the `nil` key are ignored
-        toStore (S.execState (C.update (TableRef "_t" NilVal) (IntVal 3)) extendedEnv) ~?= toStore extendedEnv,
-        S.evalState (C.index (GlobalRef "t")) extendedEnv ~?= TableVal "_t0"
+        toStore (State.execState (C.update (TableRef "_t" NilVal) (IntVal 3)) extendedEnv) ~?= toStore extendedEnv,
+        State.evalState (C.index (GlobalRef "t")) extendedEnv ~?= TableVal "_t0"
       ]
 
 test_update :: Test
@@ -59,13 +61,13 @@ test_update =
   "index tests" ~:
     TestList
       [ -- If we assign to x, then we can find its new value
-        S.evalState (C.update xref (IntVal 4) >> C.index xref) initialEnv ~?= IntVal 4,
+        State.evalState (C.update xref (IntVal 4) >> C.index xref) initialEnv ~?= IntVal 4,
         -- If we assign to x, then remove it, we cannot find it anymore
-        S.evalState (C.update xref (IntVal 4) >> C.update xref NilVal >> C.index xref) initialEnv ~?= NilVal,
+        State.evalState (C.update xref (IntVal 4) >> C.update xref NilVal >> C.index xref) initialEnv ~?= NilVal,
         -- If we assign to t.y, then we can find its new value
-        S.evalState (C.update yref (IntVal 5) >> C.index yref) extendedEnv ~?= IntVal 5,
+        State.evalState (C.update yref (IntVal 5) >> C.index yref) extendedEnv ~?= IntVal 5,
         -- If we assign nil to t.y, then we cannot find it
-        S.evalState (C.update yref NilVal >> C.index yref) extendedEnv ~?= NilVal
+        State.evalState (C.update yref NilVal >> C.index yref) extendedEnv ~?= NilVal
       ]
 
 test_resolveVar :: Test
@@ -73,23 +75,23 @@ test_resolveVar =
   "resolveVar" ~:
     TestList
       [ -- we should be able to resolve global variable `x` in the initial store, even though it is not defined
-        S.evalState (resolveVar (Name "x")) initialEnv ~?= Just (GlobalRef "x") ,
-        S.evalState (resolveVar (Name "x")) extendedEnv ~?= Just (GlobalRef "x"),
+        State.evalState (resolveVar (Name "x")) initialEnv ~?= Just (GlobalRef "x"),
+        State.evalState (resolveVar (Name "x")) extendedEnv ~?= Just (GlobalRef "x"),
         -- But in the case of Dot or Proj, the first argument should evaluate to a
         -- TableVal that is defined in the store. If it does not, then resolveVar
         -- should return Nothing.
-        S.evalState (resolveVar (Dot (Val NilVal) "x")) initialEnv ~?= Nothing,
-        S.evalState (resolveVar (Dot (Var (Name "t")) "x")) initialEnv ~?= Nothing,
+        State.evalState (resolveVar (Dot (Val NilVal) "x")) initialEnv ~?= Nothing,
+        State.evalState (resolveVar (Dot (Var (Name "t")) "x")) initialEnv ~?= Nothing,
         -- For Proj we also shouldn't project from Nil
-        S.evalState (resolveVar (Proj (Var (Name "t")) (Val NilVal))) extendedEnv ~?= Nothing,
+        State.evalState (resolveVar (Proj (Var (Name "t")) (Val NilVal))) extendedEnv ~?= Nothing,
         -- If the table is defined, we should return a reference to it, even when the field is undefined
-        S.evalState (resolveVar (Dot (Var (Name "t")) "z")) extendedEnv ~?= Just (TableRef "_t0" (StringVal "z")),
-        S.evalState (resolveVar (Dot (Var (Name "t")) "y")) extendedEnv ~?= Just (TableRef "_t0" (StringVal "y")),
-        S.evalState (resolveVar (Dot (Var (Name "t2")) "z")) extendedEnv ~?= Nothing,
+        State.evalState (resolveVar (Dot (Var (Name "t")) "z")) extendedEnv ~?= Just (TableRef "_t0" (StringVal "z")),
+        State.evalState (resolveVar (Dot (Var (Name "t")) "y")) extendedEnv ~?= Just (TableRef "_t0" (StringVal "y")),
+        State.evalState (resolveVar (Dot (Var (Name "t2")) "z")) extendedEnv ~?= Nothing,
         -- and how we refer to the field shouldn't matter
-        S.evalState (resolveVar (Proj (Var (Name "t")) (Val (StringVal "z")))) extendedEnv ~?= Just (TableRef "_t0" (StringVal "z")),
-        S.evalState (resolveVar (Proj (Var (Name "t2")) (Val (StringVal "z")))) extendedEnv ~?= Nothing,
-        S.evalState (resolveVar (Proj (Val NilVal) (Val (StringVal "z")))) extendedEnv ~?= Nothing
+        State.evalState (resolveVar (Proj (Var (Name "t")) (Val (StringVal "z")))) extendedEnv ~?= Just (TableRef "_t0" (StringVal "z")),
+        State.evalState (resolveVar (Proj (Var (Name "t2")) (Val (StringVal "z")))) extendedEnv ~?= Nothing,
+        State.evalState (resolveVar (Proj (Val NilVal) (Val (StringVal "z")))) extendedEnv ~?= Nothing
       ]
 
 test_evaluateNot :: Test
@@ -116,41 +118,51 @@ test_tableConst :: Test
 test_tableConst =
   "evaluate { x = 3 } " ~:
     TestList
-      [ toStore (S.execState
-          (evalE (TableConst [FieldName "x" (Val (IntVal 3))]))
-          initialEnv)
+      [ toStore
+          ( State.execState
+              (evalE (TableConst [FieldName "x" (Val (IntVal 3))]))
+              initialEnv
+          )
           ~?= Map.fromList
-                  [ ("_G", Map.empty),
-                    ("_t0", Map.fromList [(StringVal "x", IntVal 3)])
-                  ],
-        toStore (S.execState
-          (evalE (TableConst [FieldName "x" (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
-          initialEnv)
+            [ ("_G", Map.empty),
+              ("_t0", Map.fromList [(StringVal "x", IntVal 3)])
+            ],
+        toStore
+          ( State.execState
+              (evalE (TableConst [FieldName "x" (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
+              initialEnv
+          )
           ~?= Map.fromList
-                  [ ("_G", Map.empty),
-                    ("_t0", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
-                  ],
-        toStore (S.execState
-          (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3))]))
-          initialEnv)
+            [ ("_G", Map.empty),
+              ("_t0", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
+            ],
+        toStore
+          ( State.execState
+              (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3))]))
+              initialEnv
+          )
           ~?= Map.fromList
-                  [ ("_G", Map.empty),
-                    ("_t0", Map.fromList [(StringVal "x", IntVal 3)])
-                  ],
-        toStore (S.execState
-          (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
-          initialEnv)
+            [ ("_G", Map.empty),
+              ("_t0", Map.fromList [(StringVal "x", IntVal 3)])
+            ],
+        toStore
+          ( State.execState
+              (evalE (TableConst [FieldKey (Val (StringVal "x")) (Val (IntVal 3)), FieldName "y" (Val (IntVal 5))]))
+              initialEnv
+          )
           ~?= Map.fromList
-                  [ ("_G", Map.empty),
-                    ("_t0", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
-                  ],
-        toStore (S.execState
-          (evalE (TableConst []))
-          initialEnv)
+            [ ("_G", Map.empty),
+              ("_t0", Map.fromList [(StringVal "x", IntVal 3), (StringVal "y", IntVal 5)])
+            ],
+        toStore
+          ( State.execState
+              (evalE (TableConst []))
+              initialEnv
+          )
           ~?= Map.fromList
-                  [ ("_G", Map.empty),
-                    ("_t0", Map.empty)
-                  ]
+            [ ("_G", Map.empty),
+              ("_t0", Map.empty)
+            ]
       ]
 
 test_evalOp2 :: Test
@@ -183,20 +195,19 @@ test_evalOp2 =
         evaluate (Op2 (Val (StringVal "hello ")) Concat (Val (StringVal "world!"))) initialEnv ~?= StringVal "hello world!"
       ]
 
-test_error :: Test 
-test_error = 
+test_error :: Test
+test_error =
   "evaluating errors" ~:
-    TestList 
-    [
-      evaluate (Op2 (Val (IntVal 3)) Plus (Val (StringVal "here"))) initialEnv ~?= ErrorVal IllegalArguments, 
-      evaluate (Op2 (Val (IntVal 3)) Plus (Val (BoolVal True))) initialEnv ~?= ErrorVal IllegalArguments, 
-      evaluate (Op2 (Val (IntVal 10)) Plus (Val NilVal)) initialEnv ~?= ErrorVal IllegalArguments, 
-      evaluate (Op2 (Val (BoolVal True)) Concat (Val NilVal)) initialEnv ~?= ErrorVal IllegalArguments, 
-      evaluate (Op2 (Val (IntVal 10)) Times (Val (StringVal "here"))) initialEnv ~?= ErrorVal IllegalArguments, 
-      evaluate (Op2 (Val (BoolVal True)) Divide (Val NilVal)) initialEnv ~?= ErrorVal IllegalArguments, 
-      evaluate (Op2 (Val (IntVal 10)) Divide (Val (IntVal 0))) initialEnv ~?= ErrorVal DivideByZero, 
-      evaluate (Op2 (Val (IntVal 10)) Divide (Op2 (Val (IntVal 5)) Minus (Val (IntVal 5)))) initialEnv ~?= ErrorVal DivideByZero
-    ]
+    TestList
+      [ evaluate (Op2 (Val (IntVal 3)) Plus (Val (StringVal "here"))) initialEnv ~?= ErrorVal IllegalArguments,
+        evaluate (Op2 (Val (IntVal 3)) Plus (Val (BoolVal True))) initialEnv ~?= ErrorVal IllegalArguments,
+        evaluate (Op2 (Val (IntVal 10)) Plus (Val NilVal)) initialEnv ~?= ErrorVal IllegalArguments,
+        evaluate (Op2 (Val (BoolVal True)) Concat (Val NilVal)) initialEnv ~?= ErrorVal IllegalArguments,
+        evaluate (Op2 (Val (IntVal 10)) Times (Val (StringVal "here"))) initialEnv ~?= ErrorVal IllegalArguments,
+        evaluate (Op2 (Val (BoolVal True)) Divide (Val NilVal)) initialEnv ~?= ErrorVal IllegalArguments,
+        evaluate (Op2 (Val (IntVal 10)) Divide (Val (IntVal 0))) initialEnv ~?= ErrorVal DivideByZero,
+        evaluate (Op2 (Val (IntVal 10)) Divide (Op2 (Val (IntVal 5)) Minus (Val (IntVal 5)))) initialEnv ~?= ErrorVal DivideByZero
+      ]
 
 tExecTest :: Test
 tExecTest =
@@ -275,7 +286,7 @@ prop_evalE_total e s = case evaluate e (fromStore s) of
   StringVal s -> s `seq` True
   TableVal n -> n `seq` True
   FunctionVal ps rt b -> ps `seq` rt `seq` b `seq` True
-  ErrorVal _ -> True -- We don't generate these, so this won't be hit. 
+  ErrorVal _ -> True -- We don't generate these, so this won't be hit.
 
 qc :: IO ()
 qc = do

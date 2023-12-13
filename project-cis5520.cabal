@@ -48,7 +48,6 @@ library
       LuSyntax 
       LuTypeChecker
       LuTypes
-      State
       Parser
       Stack
       Context
