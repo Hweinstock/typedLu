@@ -162,12 +162,15 @@ test_typeCheck =
         "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False,
         "nameShadow" ~: testTypeCheckFile "test/lu/nameShadow.lu" True,
         "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False,
-        "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" True,
+        "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" False,
         "unionReturn2" ~: testTypeCheckFile "test/lu/unionReturn2.lu" True,
         "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False,
         "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True,
         "redefine" ~: testTypeCheckFile "test/lu/redefine.lu" False,
-        "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True
+        "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True,
+        "typedBFS" ~: testTypeCheckFile "test/lu/typedBFS.lu" True,
+        "typedTable" ~: testTypeCheckFile "test/lu/typedTable.lu" True,
+        "redefineOk" ~: testTypeCheckFile "test/lu/redefineOk.lu" True
       ]
 
 test_typeCheckStore :: Test

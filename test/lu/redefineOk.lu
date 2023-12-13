@@ -1,0 +1,5 @@
+x : string | int | boolean = 5 
+x = true 
+x = "here"
+x = false 
+x = 1

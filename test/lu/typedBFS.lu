@@ -1,0 +1,50 @@
+start = 1
+goal = 10
+;
+graph : {int : {int : int}} = {}
+graph[1] = {[1] = 2, [2] = 3}
+graph[2] = {[1] = 6, [2] = 5, [3] = 1}
+graph[3] = {[1] = 1}
+graph[4] = {[1] = 7, [2] = 8}
+graph[5] = {[1] = 9, [2] = 10, [3] = 2}
+graph[6] = {[1] = 2}
+graph[7] = {[1] = 4, [2] = 11, [3] = 12}
+graph[8] = {[1] = 4}
+graph[9] = {[1] = 5}
+graph[10] = {[1] = 5}
+graph[11] = {[1] = 7}
+graph[12] = {[1] = 7}
+;
+q_elements : {int : int} = {}
+q = {first = 0, last = 0}
+q_elements[q.last] = start
+q.last = q.last + 1
+;
+visited : {int : boolean} = {}
+visited[start] = true
+found = false
+;
+repeat 
+  node = q_elements[q.first]
+  q_elements[q.first] = -1
+  q.first = q.first + 1
+  ; 
+  visited[node] = true
+  if goal == node then
+    found = true
+    q.first = q.last
+  else 
+    i = 1
+    while i <= # graph[node] do 
+      next = graph[node][i]
+      if not visited[next] then
+        q_elements[q.last] = next
+        q.last = q.last + 1
+        else
+        ;
+      end
+      i = i + 1
+    end
+  end 
+until
+  q.last - q.first == 0
