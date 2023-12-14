@@ -47,7 +47,13 @@ CP2:
 - [x] Implement `synthesis`.
 - [x] Implement `typeCheckBlock` and `typeCheckStatement`.
 - [x] Generalize store used in evaluator to use `Environment`. (Harry)
-- [x] Build some nice demo/ui to show that it works. 
+- [x] Build some nice demo/ui to show that it works.
+
+### Generating Well-Typed Functions
+- Issue with While and Repeat statements with infinite loops. Tried adding an additional expression that would eventually evaluate to false, but couldn't get it to work.
+- Issue with Table constructions having the same key multiple times.
+- Functions not being generated at the moment. Was planning on doing so once the above are resolved.
+- All else works.
 
 Potential Extensions:
 - [ ] Implement Local variables. 
