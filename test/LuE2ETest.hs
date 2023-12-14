@@ -1,7 +1,10 @@
+{-# LANGUAGE FunctionalDependencies #-}
+
 module LuE2ETest where
 
-import Context (Context, ExtendedContext)
+import Context (Context, Environment, Reference (GlobalRef))
 import Context qualified as C
+import Control.Monad.State qualified as State
 import Data.Either (isLeft)
 import Data.Map qualified as Map
 import Data.Maybe (isJust)
@@ -9,12 +12,11 @@ import LuEvaluator (EvalEnv, Store, errorCodeName, eval, exec, globalTableName, 
 import LuEvaluatorTest (initialEnv)
 import LuParser (parseLuFile)
 import LuSyntax
-import LuTypeChecker (TypeEnv, getUncalledFunc, runForEnv, typeCheckAST)
+import LuTypeChecker (TypeEnv, execEnv, getUncalledFunc, typeCheckAST)
 import LuTypes
-import State qualified as S
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 
-class (ExtendedContext env) => TestableEnvironment env where
+class (Environment env v) => TestableEnvironment env v | env -> v where
   execBlock :: Block -> env -> Either String env
 
   runFileForStore :: String -> IO (Either String env)
@@ -22,7 +24,7 @@ class (ExtendedContext env) => TestableEnvironment env where
     parseResult <- parseLuFile fp
     return $ case parseResult of
       (Left _) -> Left "Failed to parse file"
-      (Right ast) -> execBlock ast C.emptyContext
+      (Right ast) -> execBlock ast C.emptyEnv
 
   checkOutputStore :: String -> (env -> Bool) -> IO Bool
   checkOutputStore fp checkFn = do
@@ -34,13 +36,13 @@ class (ExtendedContext env) => TestableEnvironment env where
   testFile :: String -> (env -> Bool) -> IO Assertion
   testFile fp checkFn = assert <$> checkOutputStore fp checkFn
 
-instance TestableEnvironment EvalEnv where
+instance TestableEnvironment EvalEnv Value where
   execBlock :: Block -> EvalEnv -> Either String EvalEnv
   execBlock = exec
 
-instance TestableEnvironment TypeEnv where
+instance TestableEnvironment TypeEnv LType where
   execBlock :: Block -> TypeEnv -> Either String TypeEnv
-  execBlock = runForEnv
+  execBlock = execEnv
 
 testTypeCheckFile :: String -> Bool -> IO Assertion
 testTypeCheckFile fp expected = do
@@ -62,7 +64,7 @@ testIOResult b = b >>= assert
 
 -- | Check property of variable in env.
 checkVarProperty :: String -> (Value -> Bool) -> EvalEnv -> Bool
-checkVarProperty targetName property env = property $ S.evalState (C.lookup targetName) env
+checkVarProperty targetName property env = property $ snd $ State.evalState (C.resolveName targetName) env
 
 -- | Check if variable holds target value in store.
 checkVarValueInStore :: String -> Value -> EvalEnv -> Bool
@@ -77,19 +79,19 @@ checkVarValuesInStore :: [(String, Value)] -> EvalEnv -> Bool
 checkVarValuesInStore valuePairs env = all (\(n, v) -> checkVarValueInStore n v env) valuePairs
 
 -- Run Typechecker and print the result.
-seeTypeStore :: String -> IO ()
-seeTypeStore fp = do
+seeTypeEnv :: String -> IO ()
+seeTypeEnv fp = do
   (r :: Either String TypeEnv) <- runFileForStore fp
   case r of
-    Left l -> print l
-    Right r -> print r
+    Left l -> putStrLn ("Error: \n" ++ show r)
+    Right r -> putStrLn ("Successfully type-checked with store: \n" ++ show r)
 
-seeEvalStore :: String -> IO ()
-seeEvalStore fp = do
+seeEvalEnv :: String -> IO ()
+seeEvalEnv fp = do
   (r :: Either String EvalEnv) <- runFileForStore fp
   case r of
-    Left l -> print l
-    Right r -> print r
+    Left l -> putStrLn ("Error: " ++ show r)
+    Right r -> putStrLn ("Successfully evaluated with store: " ++ show r)
 
 test_if :: Test
 test_if =
@@ -115,7 +117,8 @@ test_function =
         "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"),
         "function7" ~: testFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)]),
         "nameShadow" ~: testFile "test/lu/nameShadow.lu" (checkVarValuesInStore [("res", IntVal 10), ("s", StringVal "s")]),
-        "mutualRecFunction" ~: testFile "test/lu/mutualRecFunc.lu" (checkVarValuesInStore [("result", BoolVal True), ("result2", BoolVal True)])
+        "mutualRecFunction" ~: testFile "test/lu/mutualRecFunc.lu" (checkVarValuesInStore [("result", BoolVal True), ("result2", BoolVal True)]),
+        "hofFunctionGood" ~: testFile "test/lu/hofFunctionGood.lu" (checkVarValuesInStore [("z", IntVal 1)])
         -- "functionFromTable" ~: testFile "test/lu/functionFromTable.lu" (checkVarValuesInStore [("result", IntVal 6)])
       ]
 
@@ -160,10 +163,16 @@ test_typeCheck =
         "nestedFuncReturnTypeBad2" ~: testTypeCheckFile "test/lu/nestedFuncReturnTypeBad2.lu" False,
         "nameShadow" ~: testTypeCheckFile "test/lu/nameShadow.lu" True,
         "nameShadowBad" ~: testTypeCheckFile "test/lu/nameShadowBad.lu" False,
-        "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" True,
+        "unionReturn" ~: testTypeCheckFile "test/lu/unionReturn.lu" False,
         "unionReturn2" ~: testTypeCheckFile "test/lu/unionReturn2.lu" True,
         "missingReturn" ~: testTypeCheckFile "test/lu/missingReturn.lu" False,
-        "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True
+        "mutualRec" ~: testTypeCheckFile "test/lu/mutualRecFunc.lu" True,
+        "redefine" ~: testTypeCheckFile "test/lu/redefine.lu" False,
+        "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True,
+        "typedBFS" ~: testTypeCheckFile "test/lu/typedBFS.lu" True,
+        "typedTable" ~: testTypeCheckFile "test/lu/typedTable.lu" True,
+        "redefineOk" ~: testTypeCheckFile "test/lu/redefineOk.lu" True,
+        "hofFunctionGood" ~: testTypeCheckFile "test/lu/hofFunctionGood.lu" True
       ]
 
 test_typeCheckStore :: Test
@@ -176,12 +185,12 @@ test_typeCheckStore =
       ]
   where
     containsFunc :: Name -> TypeEnv -> Bool
-    containsFunc n env = isJust $ getUncalledFunc env n
+    containsFunc n env = isJust $ getUncalledFunc env (GlobalRef n)
 
     isNilOrUndefined :: Name -> Bool -> TypeEnv -> Bool
     isNilOrUndefined n expected env = expected == (actual == NilType || actual == UnknownType)
       where
-        actual = S.evalState (C.lookup n) env
+        actual = snd $ State.evalState (C.resolveName n) env
 
 test_error :: Test
 test_error =

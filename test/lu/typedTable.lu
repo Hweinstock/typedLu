@@ -1,0 +1,7 @@
+a : {string | int : int | string} = {} 
+k : int | string = "x"
+a[k] = 10    
+a[20] = "great"  
+o1 = a["x"] 
+k = 20
+o2 = a[k]   

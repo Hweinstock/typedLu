@@ -6,12 +6,11 @@ import LuEvaluator (Store)
 import LuSyntax
 import LuTypeChecker
 import LuTypes
-import State qualified as S
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 
 store :: TypeEnv
-store = C.setGMap typeMap emptyTypeEnv
+store = C.setGMap typeMap C.emptyEnv
   where
     typeMap =
       Map.fromList
@@ -284,28 +283,44 @@ test_typeCheckStatement :: Test
 test_typeCheckStatement =
   "typechecking statement" ~:
     TestList
-      [ S.evalState (typeCheckStatement (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) Never) emptyTypeEnv ~?= Right NilType,
-        S.evalState (typeCheckStatement (Return (Val (StringVal "foo"))) StringType) emptyTypeEnv ~?= Right StringType,
-        S.evalState (typeCheckStatement (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])) StringType) emptyTypeEnv ~?= Right StringType
+      [ evalType (Assign (Name "f", FunctionType IntType StringType) (Val (FunctionVal [("a", IntType)] StringType (Block [Return (Val (StringVal "here"))])))) C.emptyEnv ~?= Right NilType,
+        evalType (Return (Val (StringVal "foo"))) C.emptyEnv ~?= Right StringType,
+        evalType (If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])) C.emptyEnv ~?= Right StringType
       ]
 
 test_typeCheckBlock :: Test
 test_typeCheckBlock =
   "typechecking block" ~:
     TestList
-      [ S.evalState (typeCheckBlock (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])]) StringType) emptyTypeEnv ~?= Right StringType,
-        S.evalState (typeCheckBlock (Block [Return (Val (StringVal "foo"))]) StringType) emptyTypeEnv ~?= Right StringType
+      [ evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (StringVal "foo"))]) (Block [Return (Val (StringVal "not foo"))])]) C.emptyEnv ~?= Right StringType,
+        evalType (Block [If (Val (BoolVal True)) (Block [Return (Val (IntVal 5))]) (Block [Return (Val (StringVal "not foo"))])]) C.emptyEnv ~?= Right (UnionType StringType IntType),
+        evalType (Block [Return (Val (StringVal "foo"))]) C.emptyEnv ~?= Right StringType,
+        evalType (Block [Return (Val (IntVal 5))]) C.emptyEnv ~?= Right IntType,
+        evalType (Block []) C.emptyEnv ~?= Right NilType
       ]
 
 test_typeCheckBlocks :: Test
 test_typeCheckBlocks =
   "typehecking multiple Blocks" ~:
     TestList
-      [ typeCheckBlocks emptyTypeEnv StringType [Block [Return (Val (StringVal "foo"))], Block [Return (Val (StringVal "not foo"))]] ~?= Right StringType
+      [ typeCheckBlocks C.emptyEnv StringType [Block [Return (Val (StringVal "foo"))], Block [Return (Val (StringVal "not foo"))]] ~?= Right StringType,
+        typeCheckBlocks C.emptyEnv StringType [Block [Return (Val (IntVal 5))], Block [Return (Val (StringVal "not foo"))]] ~?= Right (UnionType StringType IntType),
+        typeCheckBlocks C.emptyEnv StringType [Block [Return (Val (IntVal 5))], Block []] ~?= Right (UnionType StringType NilType)
+      ]
+
+test_uncalledFunc :: Test
+test_uncalledFunc =
+  "tracking uncalled funcs" ~:
+    TestList
+      [ -- Adding func to map should make it accessible.
+        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyEnv) (C.GlobalRef "foo") ~?= Just (FunctionVal [] NilType (Block [])),
+        -- only get func that matches name.
+        getUncalledFunc (addUncalledFunc (C.GlobalRef "foo2") (FunctionVal [] NilType (Block [])) C.emptyEnv) (C.GlobalRef "foo") ~?= Nothing,
+        getUncalledFunc (removeUncalledFunc (addUncalledFunc (C.GlobalRef "foo") (FunctionVal [] NilType (Block [])) C.emptyEnv) (C.GlobalRef "foo")) (C.GlobalRef "foo") ~?= Nothing
       ]
 
 test :: IO Counts
-test = runTestTT $ TestList [test_typeCheckBlock, test_typeCheckStatement, test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
+test = runTestTT $ TestList [test_uncalledFunc, test_typeCheckBlock, test_typeCheckStatement, test_isSubtype, test_checkerVar, test_checkerVal, test_checkerOp1, test_checkerOp2, test_checkerTableConst, test_checkerCall, test_synthesisVar, test_synthesisVal, test_synthesisOp1, test_synthesisOp2, test_synthesisTableConst, test_synthesisCall]
 
 {-
 ===================================================================

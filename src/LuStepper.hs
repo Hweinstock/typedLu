@@ -1,62 +1,63 @@
 module LuStepper where
 
-import System.IO
-import LuSyntax
-import LuParser qualified
-import LuEvaluator
-import Data.Maybe (fromMaybe)
-import Text.Read (readMaybe)
-import Data.List qualified as List
-import State (State)
-import State qualified as S
 import Context qualified as C
+import Control.Monad.State (MonadState)
+import Control.Monad.State qualified as State
+import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
+import Data.Maybe (fromMaybe)
+import LuEvaluator
+import LuParser qualified
+import LuSyntax
+import System.IO
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
+import Text.Read (readMaybe)
 
-step :: Block -> State EvalEnv Block
+step :: (MonadState EvalEnv m) => Block -> m Block
 step b@(Block []) = return b
-step b@(Block (s:ss)) = continueWithFlags (Block ss) (doStep b) where 
-  doStep (Block ((If e (Block ss1) (Block ss2)) : otherSs)) = do
-    v <- evalE e
-    if toBool v
-      then return $ Block (ss1 ++ otherSs)
-      else return $ Block (ss2 ++ otherSs)
-  doStep (Block (w@(While e (Block ss)) : otherSs)) = do
-    v <- evalE e
-    if toBool v
-      then return $ Block (ss ++ [w] ++ otherSs)
-      else return $ Block otherSs
-  doStep (Block (a@(Assign (v, _) e) : otherSs)) = do
-    newState <- evalS a
-    return $ Block otherSs
-  doStep (Block ((Repeat b e) : otherSs)) = doStep (Block (While (Op1 Not e) b : otherSs))
-  doStep (Block (empty : otherSs)) = return $ Block otherSs
-  doStep b@(Block []) = return b
+step b@(Block (s : ss)) = continueWithFlags (Block ss) (doStep b)
+  where
+    doStep (Block ((If e (Block ss1) (Block ss2)) : otherSs)) = do
+      v <- evalE e
+      if toBool v
+        then return $ Block (ss1 ++ otherSs)
+        else return $ Block (ss2 ++ otherSs)
+    doStep (Block (w@(While e (Block ss)) : otherSs)) = do
+      v <- evalE e
+      if toBool v
+        then return $ Block (ss ++ [w] ++ otherSs)
+        else return $ Block otherSs
+    doStep (Block (a@(Assign (v, _) e) : otherSs)) = do
+      newState <- evalS a
+      return $ Block otherSs
+    doStep (Block ((Repeat b e) : otherSs)) = doStep (Block (While (Op1 Not e) b : otherSs))
+    doStep (Block (empty : otherSs)) = return $ Block otherSs
+    doStep b@(Block []) = return b
 
 -- | Evaluate this block for a specified number of steps
-boundedStep :: Int -> Block -> State EvalEnv Block
+boundedStep :: (MonadState EvalEnv m) => Int -> Block -> m Block
 boundedStep 0 b = return b
 boundedStep _ b | final b = return b
 boundedStep n b = step b >>= boundedStep (n - 1)
 
 -- | Evaluate this block for a specified number of steps, using the specified store
 steps :: Int -> Block -> EvalEnv -> (Block, EvalEnv)
-steps n block = S.runState (boundedStep n block)
+steps n block = State.runState (boundedStep n block)
 
 -- | Is this block completely evaluated?
 final :: Block -> Bool
 final (Block []) = True
 final _ = False
 
-allStep :: Block -> State EvalEnv Block
+allStep :: (MonadState EvalEnv m) => Block -> m Block
 allStep b | final b = return b
 allStep b = step b >>= allStep
 
 -- | Evaluate this block to completion
 execStep :: Block -> EvalEnv -> EvalEnv
-execStep b = S.execState (allStep b)
+execStep b = State.execState (allStep b)
 
 data Stepper = Stepper
   { filename :: Maybe String,
@@ -70,7 +71,7 @@ initialStepper =
   Stepper
     { filename = Nothing,
       block = mempty,
-      env = C.emptyContext,
+      env = C.emptyEnv,
       history = Nothing
     }
 
@@ -119,7 +120,7 @@ stepper = go initialStepper
               go (ss {filename = Just fn, block = b})
         -- dump the store
         Just (":d", _) -> do
-          putStrLn (pretty (env ss))
+          putStrLn (show (env ss))
           go ss
         -- quit the stepper
         Just (":q", _) -> return ()

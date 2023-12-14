@@ -48,7 +48,6 @@ library
       LuSyntax 
       LuTypeChecker
       LuTypes
-      State
       Parser
       Stack
       Context
@@ -80,6 +79,7 @@ test-suite project-cis5520-test
       LuStepperTest
       LuTypeCheckerTest
       LuE2ETest
+      StackTest
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
