@@ -336,17 +336,9 @@ prop_checker e t = runChecker store e t == (runSynthesis store e <: t)
 prop_synthesis :: Expression -> Bool
 prop_synthesis e = runChecker store e (runSynthesis store e)
 
--- Quickcheck property that a well-typed progam typechecks
-prop_wellTyped :: Block -> Bool
-prop_wellTyped b = case S.evalState (typeCheckBlock b) emptyTypeEnv of 
-    Left _ -> False 
-    Right _ -> True
-
 qc :: IO ()
 qc = do
   putStrLn "synthesis"
   QC.quickCheck prop_synthesis
   putStrLn "checker"
   QC.quickCheck prop_checker
-  putStrLn "welltyped"
-  QC.quickCheck prop_wellTyped

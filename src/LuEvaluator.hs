@@ -280,6 +280,7 @@ evalOp1 Len iv@(IntVal v) = return iv
 evalOp1 Len (BoolVal True) = return $ IntVal 1
 evalOp1 Len (BoolVal False) = return $ IntVal 0
 evalOp1 Not v = return $ BoolVal $ not $ toBool v
+evalOp1 _ (ErrorVal e) = return $ ErrorVal e
 evalOp1 _ _ = return $ ErrorVal IllegalArguments
 
 evalOp2 :: Bop -> Value -> Value -> Value
@@ -296,6 +297,8 @@ evalOp2 Ge v1 v2 = BoolVal $ v1 >= v2
 evalOp2 Lt v1 v2 = BoolVal $ v1 < v2
 evalOp2 Le v1 v2 = BoolVal $ v1 <= v2
 evalOp2 Concat (StringVal s1) (StringVal s2) = StringVal (s1 ++ s2)
+evalOp2 _ (ErrorVal e) _ = ErrorVal e
+evalOp2 _ _ (ErrorVal e) = ErrorVal e
 evalOp2 _ _ _ = ErrorVal IllegalArguments
 
 evaluate :: Expression -> EvalEnv -> Value

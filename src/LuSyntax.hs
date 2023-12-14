@@ -472,7 +472,7 @@ genTableField m n (TableType t1 t2) =
     n' = n `div` 2
     (l1, _) = generateValidNames m t1
     genFieldName = if t1 == StringType && not (null l1)
-      then FieldName <$> genName l1 <*> genExp m n' t2 
+      then FieldName <$> genName l1 <*> genExp m n' t2
       else FieldKey <$> genExp m n' t1 <*> genExp m n' t2
 genTableField _ _ _ = undefined -- will never reach here
 
@@ -483,10 +483,26 @@ genStatement m n =
   QC.frequency
     [ (1, genType True >>= genAssign m n'),
       (1, return Empty),
-      (n, If <$> genExp m n' BooleanType <*> genBlock m n' <*> genBlock m n'),
-      -- generate loops half as frequently as if statements
-      (n', While <$> genExp m n' BooleanType <*> genBlock m n'),
-      (n', Repeat <$> genBlock m n' <*> genExp m n' BooleanType)
+      (n, do
+        e <- genExp m n' BooleanType
+        b1 <- genBlock m n'
+        let updatedMap = updateMapFromIf m b1
+        b2 <- genBlock updatedMap n'
+        return (If e b1 b2)
+      ),
+      -- -- generate loops half as frequently as if statements
+      (n', do
+        let (l1, _) = generateValidNames m BooleanType
+        if null l1
+          then return Empty
+          else While <$> genExpVar m n' BooleanType <*> genBlock m n'
+      ),
+      (n', do
+        let (l1, _) = generateValidNames m BooleanType
+        if null l1
+          then return Empty
+          else Repeat <$> genBlock m n' <*> genExpVar m n' BooleanType
+      )
     ]
   where
     n' = n `div` 2
@@ -497,17 +513,65 @@ genAssign m n t = case generateValidNames m t of
   ([], []) -> return Empty
   (l1, l2) -> Assign <$> genTypedVar (l1 ++ l2) m n t <*> genExp m n t
 
+-- | Generate a size-controlled block
 genBlock :: Map LType [Name] -> Int -> Gen Block
-genBlock m n = Block <$> genStmts n
+genBlock m n = Block <$> genStmts m n
   where
-    genStmts 0 = pure []
-    genStmts n =
+    genStmts :: Map LType [Name] -> Int -> Gen [Statement]
+    genStmts _ 0 = pure []
+    genStmts m n =
       QC.frequency
         [ (1, return []),
-          (n, (:) <$> genStatement m n' <*> genStmts n')
+          (n, do
+            stmt <- genStatement m n'
+            let updatedMap = updateMapFromStatement m stmt
+            rest <- genStmts updatedMap n'
+            return (stmt : rest)
+          )
         ]
       where
         n' = n `div` 2
+
+-- | Update the map of valid names based on the given statement
+updateMapFromStatement :: Map LType [Name] -> Statement -> Map LType [Name]
+updateMapFromStatement m (Assign (var, varType) _) =
+  case var of
+    Name name ->
+      case Map.lookup varType m of
+        Just typeList -> -- Not the first variable of this type
+          case Map.lookup NilType m of
+            Just nilList ->
+              let updatedNilList = filter (/= name) nilList
+                  updatedTypeList = name : typeList
+              in Map.insert varType updatedTypeList (Map.insert NilType updatedNilList m)
+            Nothing -> m  -- NilType not a key
+        Nothing -> -- First variable of this type
+          case Map.lookup NilType m of
+            Just nilList ->
+              let updatedNilList = filter (/= name) nilList
+              in Map.insert varType [name] (Map.insert NilType updatedNilList m)
+            Nothing ->
+              Map.insert varType [name] m -- NilType not a key
+    _ -> m  -- Nothing to update
+updateMapFromStatement m (If _ b1 b2) = updateMapFromIf (updateMapFromIf m b1) b2
+  -- in updateMapFromBlock updatedMap b2
+updateMapFromStatement m (While _ b) = updateMapFromBlock m b
+updateMapFromStatement m (Repeat b _) = updateMapFromBlock m b
+updateMapFromStatement m _ = m
+
+-- | Update the map of valid names based on the given block
+updateMapFromBlock :: Map LType [Name] -> Block -> Map LType [Name]
+updateMapFromBlock m (Block []) = m
+updateMapFromBlock m (Block (s : ss)) =
+  let updatedMap = updateMapFromStatement m s
+  in updateMapFromBlock updatedMap (Block ss)
+
+-- | Update map of valid names after an if statement block
+updateMapFromIf :: Map LType [Name] -> Block -> Map LType [Name]
+updateMapFromIf m b =
+  case Map.lookup NilType (updateMapFromBlock m b) of
+    Just l -> Map.insert NilType l m
+    Nothing -> m
 
 -- | Generate a size-controlled type
 genType :: Bool -> Gen LType
@@ -589,7 +653,7 @@ instance Arbitrary Block where
   arbitrary = QC.sized (genBlock m) where
     m = Map.singleton NilType (map (:[]) ['a'..'z'])
 
-  shrink (Block ss) = [Block ss' | ss' <- shrink ss]
+  shrink (Block ss) = []
 
 instance Arbitrary Expression where
   arbitrary = QC.sized $ \size -> do

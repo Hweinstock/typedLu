@@ -16,7 +16,7 @@ data LType
   | TableType LType LType -- What about a table as a key??
   | UnionType LType LType
   | FunctionType LType LType -- Partial Function
-  deriving (Eq, Show)
+  deriving (Ord, Eq, Show)
 
 -- | IsSubtype: Return true if first type is valid subtype of the second.
 (<:) :: LType -> LType -> Bool
