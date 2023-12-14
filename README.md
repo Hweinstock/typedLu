@@ -4,16 +4,15 @@ Harrison Weinstock (harrykw)
 John-Wesley Appleton (johnwes) 
 
 ## File Overview
-`LuParser.hs`: Parsing for lu. Main additions include parsing functions calls, function definitions, and optional type signatures + union types. 
-`LuEvaluator.hs`: Evaluation for lu. Main additions include throwing errors and handling functions calls/definitions. 
-`LuSyntax.hs`: Define the syntax of the Lu language, as well as helpful type class instances such as generating arbitrary programs and pretty printing. 
-`LuTypes.hs`: Define the types of the typedLu language, as well as helpful helper functions and type class instances. For example, subtyping definition lives here. 
-`LuTypeChecker.hs`: Typechecking for lu. This file includes all of the typechecking logic specific to typechecking. 
-`Context.hs`: Defines `Environment` type class which contains shared logic among typechecker and evaluator (mostly working with state and tracking variables). 
-`Stack.hs`: Custom stack for use of tracking local varaibles. Mostly vanilla, with a few special features. 
-
-`LuStepper.hs`: Unchanged from HW5. 
-`Parser.hs`: Unchanged from HW5. 
+- `LuParser.hs`: Parsing for lu. Main additions include parsing functions calls, function definitions, and optional type signatures + union types.  
+- `LuEvaluator.hs`: Evaluation for lu. Main additions include throwing errors and handling functions calls/definitions.  
+- `LuSyntax.hs`: Define the syntax of the Lu language, as well as helpful type class instances such as generating arbitrary programs and pretty printing.  
+- `LuTypes.hs`: Define the types of the typedLu language, as well as helpful helper functions and type class instances. For example, subtyping definition lives here.  
+- `LuTypeChecker.hs`: Typechecking for lu. This file includes all of the typechecking logic specific to typechecking.  
+- `Context.hs`: Defines `Environment` type class which contains shared logic among typechecker and evaluator (mostly working with state and tracking variables).  
+- `Stack.hs`: Custom stack for use of tracking local varaibles. Mostly vanilla, with a few special features.  
+- `LuStepper.hs`: Unchanged from HW5. 
+- `Parser.hs`: Unchanged from HW5. 
 
 All files have corresponding test files in `/test/` with the addition of `LuE2ETest.hs`. This test file includes the code to run parsing, typechecking, and evaluating on entire programs at once. It also defines a general framework for working with these files such as helpful debugging functions. 
 
