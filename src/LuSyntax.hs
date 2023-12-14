@@ -385,9 +385,9 @@ genVar l m 0 t = Name <$> genName l
 genVar l m n t = do
   t' <- genType False
   QC.frequency
-    [ (1, Name <$> genName l),
-      (n, genDot l m n' t),
-      (n, Proj <$> genExp m n' (TableType t' t) <*> genExp m n' t')
+    [ (1, Name <$> genName l)
+      -- (n, genDot l m n' t),
+      -- (n, Proj <$> genExp m n' (TableType t' t) <*> genExp m n' t')
     ]
   where
     n' = n `div` 2
@@ -410,8 +410,8 @@ genExp m n t =
     [ (1, genExpVar m n' t),
       (1, genVal m n' t),
       (n, genUop m n' t),
-      (n, genBop m n' t),
-      (n', genTableFields m n' t)
+      (n, genBop m n' t)
+      -- (n', genTableFields m n' t)
     ]
   where
     n' = n `div` 2
@@ -429,7 +429,7 @@ genVal _ _ StringType = Val . StringVal <$> genStringLit
 genVal  _ _ BooleanType = Val . BoolVal <$> arbitrary
 genVal m n (UnionType t1 t2) = QC.oneof [genVal m n t1, genVal m n t2]
 genVal m n t@(TableType t1 t2)= genTableFields m n t
-genVal m n (FunctionType t1 t2) = undefined
+-- genVal m n (FunctionType t1 t2) = undefined
 genVal _ _ _ = undefined -- will never reach here
 
 -- | Generate a unary operator
@@ -489,20 +489,20 @@ genStatement m n =
         let updatedMap = updateMapFromIf m b1
         b2 <- genBlock updatedMap n'
         return (If e b1 b2)
-      ),
-      -- -- generate loops half as frequently as if statements
-      (n', do
-        let (l1, _) = generateValidNames m BooleanType
-        if null l1
-          then return Empty
-          else While <$> genExpVar m n' BooleanType <*> genBlock m n'
-      ),
-      (n', do
-        let (l1, _) = generateValidNames m BooleanType
-        if null l1
-          then return Empty
-          else Repeat <$> genBlock m n' <*> genExpVar m n' BooleanType
       )
+      -- -- generate loops half as frequently as if statements
+      -- (n', do
+      --   let (l1, _) = generateValidNames m BooleanType
+      --   if null l1
+      --     then return Empty
+      --     else While <$> genExpVar m n' BooleanType <*> genBlock m n'
+      -- ),
+      -- (n', do
+      --   let (l1, _) = generateValidNames m BooleanType
+      --   if null l1
+      --     then return Empty
+      --     else Repeat <$> genBlock m n' <*> genExpVar m n' BooleanType
+      -- )
     ]
   where
     n' = n `div` 2
