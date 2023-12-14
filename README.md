@@ -1,40 +1,21 @@
-# project-cis5520
+# typedLu
+Members:
+Harrison Weinstock (harrykw)
+John-Wesley Appleton (johnwes) 
 
-This is an "Empty project" for Haskell. It is configured in the same way as
-the lecture demo and homework assignments for CIS 5520, but contains no
-code. Feel free to use this repository for experimentation!
+## File Overview
+`LuParser.hs`: Parsing for lu. Main additions include parsing functions calls, function definitions, and optional type signatures + union types. 
+`LuEvaluator.hs`: Evaluation for lu. Main additions include throwing errors and handling functions calls/definitions. 
+`LuSyntax.hs`: Define the syntax of the Lu language, as well as helpful type class instances such as generating arbitrary programs and pretty printing. 
+`LuTypes.hs`: Define the types of the typedLu language, as well as helpful helper functions and type class instances. For example, subtyping definition lives here. 
+`LuTypeChecker.hs`: Typechecking for lu. This file includes all of the typechecking logic specific to typechecking. 
+`Context.hs`: Defines `Environment` type class which contains shared logic among typechecker and evaluator (mostly working with state and tracking variables). 
+`Stack.hs`: Custom stack for use of tracking local varaibles. Mostly vanilla, with a few special features. 
 
-If you want to change the name of this project, look for all occurrences of
-`project-cis5520` in the `project-cis5520.cabal` file and in the `hie.yaml` 
-file. (And change the name of the cabal file to match your new name!)
+`LuStepper.hs`: Unchanged from HW5. 
+`Parser.hs`: Unchanged from HW5. 
 
-## Module organization
-
-Haskell packages typically divide their source code into three separate places:
-
-  - The bulk of your code should be developed as a reusable library in 
-    modules in the `src` directory. We've created [Lib.hs](src/Lib.hs) 
-    for you to get started. You can add additional modules here.
-  
-  - The entry point for your executable is in [Main.hs](app/Main.hs). 
-  
-  - All of your test cases should be in [the test directory](test/Spec.hs).
-
-## Building, running, and testing
-
-This project compiles with `stack build`. 
-You can run the main executable with `stack run`.
-You can run the tests with `stack test`. 
-
-Finally, you can start a REPL with `stack ghci`.
-
-## Importing additional libraries
-
-This project is designed to run with stackage: you can easily use any library
-in https://www.stackage.org/lts-21.6 by adding an entry to the
-`build-depends` list of the `common-stanza` in the cabal file. If you want to
-use a library that is not on stackage, you'll need to update the common-stanza
-*and* add information to `stack.yaml` about where to find that library.
+All files have corresponding test files in `/test/` with the addition of `LuE2ETest.hs`. This test file includes the code to run parsing, typechecking, and evaluating on entire programs at once. It also defines a general framework for working with these files such as helpful debugging functions. 
 
 ## TODO 
 CP1:
@@ -55,9 +36,9 @@ CP2:
 - [x] Fix parser to get round-trip propert back (Harry)
 - [x] Modify evaluator to return `ErrorVal` instead of `NilVal`. (Harry)
 - [x] Change return type on the type checker functions to be `Either String ()` monad (+ update tests). 
-- [ ] Outline abitrary and shrink for well-typed programs. (Wes)
-- [ ] Add additional quickCheck property for type checker about well-typed programs. (Wes)
-- [ ] Implement arbitrary and shrink for well-typed programs. (Wes)
+- [x] Outline abitrary and shrink for well-typed programs. (Wes)
+- [x] Add additional quickCheck property for type checker about well-typed programs. (Wes)
+- [x] Implement arbitrary and shrink for well-typed programs. (Wes)
 - [x] Implement arbitrary and shrink for `LType`. (Harry)
 - [x] Modify parser to parse functions with basic types (nil, int, string, boolean). 
 - [x] Add more advanced types to the parser (table, functions, unions)
@@ -67,8 +48,7 @@ CP2:
 - [x] Implement `synthesis`.
 - [x] Implement `typeCheckBlock` and `typeCheckStatement`.
 - [x] Generalize store used in evaluator to use `Environment`. (Harry)
-- [ ] Tweak parser (and typechecker) to allow functions called straight from tables. (Harry)
-- [ ] Build some nice demo/ui to show that it works. 
+- [x] Build some nice demo/ui to show that it works. 
 
 Potential Extensions:
 - [ ] Implement Local variables. 
@@ -78,7 +58,5 @@ Potential Extensions:
 - [ ] Type assertions / coercions
 - [ ] Allow optional types in tables and functions. 
 - [ ] Other things?
-
-## Questions for Nick 
 
 
