@@ -288,7 +288,18 @@ prop_evalE_total e s = case evaluate e (fromStore s) of
   FunctionVal ps rt b -> ps `seq` rt `seq` b `seq` True
   ErrorVal _ -> True -- We don't generate these, so this won't be hit.
 
+-- Quickcheck property that a well-typed progam executes without error
+prop_wellTyped :: Block -> Bool
+prop_wellTyped b = let finalEnv = execWithoutError b initialEnv in
+  (not (didError finalEnv) || 
+  (case getError finalEnv of 
+    IllegalArguments -> False 
+    _ -> True))
+
+
 qc :: IO ()
 qc = do
   putStrLn "evalE_total"
   quickCheckN 100 prop_evalE_total
+  putStrLn "welltyped"
+  quickCheckN 100 prop_wellTyped

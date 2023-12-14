@@ -12,6 +12,7 @@ import qualified Test.QuickCheck as QC
 import Text.PrettyPrint (Doc, (<+>))
 import qualified Text.PrettyPrint as PP
 import Data.Hashable (hash)
+import qualified Data.Maybe
 
 newtype Block = Block [Statement] -- s1 ... sn
   deriving (Eq, Show)
@@ -55,8 +56,8 @@ data Value
 
 data ErrorCode = IllegalArguments | DivideByZero | UnknownError deriving (Eq, Show, Enum)
 
-type Parameter = (Name, LType) 
-  
+type Parameter = (Name, LType)
+
 data Uop
   = Neg -- `-` :: Int -> Int
   | Not -- `not` :: a -> Bool
@@ -94,17 +95,17 @@ var :: String -> Expression
 var = Var . Name
 
 -- | Helper function to hash value data types. 
-hashVal :: Value -> Int 
+hashVal :: Value -> Int
 hashVal NilVal = hash "NilVal"
 hashVal (IntVal i) = hash i
 hashVal (BoolVal b) = hash b
-hashVal (StringVal s) = hash s 
-hashVal (TableVal n) = hash $ "table" ++ n 
+hashVal (StringVal s) = hash s
+hashVal (TableVal n) = hash $ "table" ++ n
 hashVal (FunctionVal ps rt b) = hash (show ps ++ show rt ++ show b)
 hashVal (ErrorVal s) = hash $ fromEnum s
 
 -- | Implement custom Ord via hasing since function values make deriving Ord difficult. 
-instance Ord Value where 
+instance Ord Value where
   v1 `compare` v2 = hashVal v1 `compare` hashVal v2
 
 -- test.lu
@@ -223,18 +224,19 @@ instance PP String where
 instance PP Int where
   pp = PP.int
 
-instance PP TypedVar where 
+instance PP TypedVar where
   pp (v, t) = pp v <> PP.char ':' <> pp t
 
-instance PP LType where 
+instance PP LType where
   pp Never = PP.text "never"
+  pp AnyType = PP.text "any"
   pp UnknownType = PP.text "unknown"
   pp NilType = PP.text "nil"
   pp IntType = PP.text "int"
   pp StringType = PP.text "string"
   pp BooleanType = PP.text "boolean"
   pp (TableType t1 t2) = PP.braces (pp t1 <> PP.char ':' <> pp t2)
-  pp (UnionType t1 t2) = pp t1 <> PP.char '|' <> pp t2 
+  pp (UnionType t1 t2) = pp t1 <> PP.char '|' <> pp t2
   pp (FunctionType t1 t2) = pp t1 <> PP.text "->" <> pp t2
 
 instance PP Var where
@@ -252,8 +254,8 @@ instance PP Value where
   pp (TableVal t) = PP.text "<" <> PP.text t <> PP.text ">"
   pp (FunctionVal ps rt b) = PP.vcat [PP.text "function" <> PP.parens (ppParameters ps) <> PP.char ':' <> pp rt, pp b]
   pp (ErrorVal s) = undefined
-  
-instance PP Parameter where 
+
+instance PP Parameter where
   pp (n, t) = pp n <> PP.char ':' <> pp t
 
 isBase :: Expression -> Bool
@@ -288,7 +290,7 @@ instance PP Expression where
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
   pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
-  pp (Call fv ps) = pp fv <> PP.parens (PP.hsep(map pp ps))
+  pp (Call fv ps) = pp fv <> PP.parens (PP.hsep (map pp ps))
 
 instance PP TableField where
   pp (FieldName name e) = pp name <+> PP.equals <+> pp e
@@ -301,8 +303,8 @@ instance PP Block where
 ppSS :: [Statement] -> Doc
 ppSS ss = PP.vcat (map pp ss)
 
-ppParameters :: [Parameter] -> Doc 
-ppParameters ps = PP.hsep (map pp ps) 
+ppParameters :: [Parameter] -> Doc
+ppParameters ps = PP.hsep (map pp ps)
 
 instance PP Statement where
   pp (Assign x e) = pp x <+> PP.equals <+> pp e
@@ -350,10 +352,21 @@ sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp)
 quickCheckN :: QC.Testable prop => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
 
+-- | Generate a list of valid names for a given type
+generateValidNames :: Map LType [Name] -> LType -> ([Name], [Name])
+generateValidNames m (UnionType t1 t2) = (l1 ++ l2, u)
+  where
+    (l1, u) = generateValidNames m t1
+    (l2, _) = generateValidNames m t2
+generateValidNames m t = (existingVars, undefinedVars)
+  where
+    existingVars = Data.Maybe.fromMaybe [] (Map.lookup t m)
+    undefinedVars = Data.Maybe.fromMaybe [] (Map.lookup NilType m)
+
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
 -- reserved words
-genName :: Gen Name
-genName = QC.elements ["_", "_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
+genName :: [Name] -> Gen Name
+genName = QC.elements
 
 -- | Generate a string literal, being careful about the characters that it may contain
 genStringLit :: Gen String
@@ -367,79 +380,227 @@ genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
     stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
 
 -- | Generate a size-controlled global variable or table field
-genVar :: Int -> Gen Var
-genVar 0 = Name <$> genName
-genVar n =
+genVar :: [Name] -> Map LType [Name] -> Int -> LType -> Gen Var
+genVar l m 0 t = Name <$> genName l
+genVar l m n t = do
+  t' <- genType False
   QC.frequency
-    [ (1, Name <$> genName),
-      (n, Dot <$> genExp n' <*> genName),
-      (n, Proj <$> genExp n' <*> genExp n')
+    [ (1, Name <$> genName l)
+      -- (n, genDot l m n' t),
+      -- (n, Proj <$> genExp m n' (TableType t' t) <*> genExp m n' t')
     ]
   where
     n' = n `div` 2
 
-genTypedVar :: Int -> Gen TypedVar
-genTypedVar n = liftA2 (,) (genVar n) arbitrary
+-- | Generate a size-controlled dot variable
+genDot :: [Name] -> Map LType [Name] -> Int -> LType -> Gen Var
+genDot l m n t = case generateValidNames m StringType of
+  ([], _) -> genVar l m 0 t
+  (l, _) -> Dot <$> genExp m n (TableType StringType t) <*> genName l
+
+-- | Generate a size-controlled typed variable
+genTypedVar :: [Name] -> Map LType [Name] -> Int -> LType -> Gen TypedVar
+genTypedVar l m n t = liftA2 (,) (genVar l m n t) (pure t)
 
 -- | Generate a size-controlled expression
-genExp :: Int -> Gen Expression
-genExp 0 = QC.oneof [Var <$> genVar 0, Val <$> arbitrary]
-genExp n =
+genExp :: Map LType [Name] -> Int -> LType -> Gen Expression
+genExp m 0 t = QC.oneof [genExpVar m 0 t, genVal m 0 t]
+genExp m n t =
   QC.frequency
-    [ (1, Var <$> genVar n),
-      (1, Val <$> arbitrary),
-      (n, Op1 <$> arbitrary <*> genExp n'),
-      (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
-      (n', TableConst <$> genTableFields n')
+    [ (1, genExpVar m n' t),
+      (1, genVal m n' t),
+      (n, genUop m n' t),
+      (n, genBop m n' t)
+      -- (n', genTableFields m n' t)
     ]
   where
     n' = n `div` 2
+
+-- | Generate a size-controlled variable or table field for an expression
+genExpVar :: Map LType [Name] -> Int -> LType -> Gen Expression
+genExpVar m n t = case generateValidNames m t of
+  ([], _) -> genVal m n t
+  (l1, l) -> Var <$> genVar l1 m n t
+
+-- | Generate a value
+genVal :: Map LType [Name] -> Int -> LType -> Gen Expression
+genVal _ _ IntType = Val . IntVal <$> arbitrary
+genVal _ _ StringType = Val . StringVal <$> genStringLit
+genVal  _ _ BooleanType = Val . BoolVal <$> arbitrary
+genVal m n (UnionType t1 t2) = QC.oneof [genVal m n t1, genVal m n t2]
+genVal m n t@(TableType t1 t2)= genTableFields m n t
+-- genVal m n (FunctionType t1 t2) = undefined
+genVal _ _ _ = undefined -- will never reach here
+
+-- | Generate a unary operator
+genUop :: Map LType [Name] -> Int -> LType -> Gen Expression
+genUop m n IntType = Op1 <$> QC.oneof [pure Neg, pure Len] <*> genExp m n IntType
+genUop m n BooleanType = Op1 Not <$> genExp m n BooleanType
+genUop m n t = genExpVar m n t -- try to generate a var
+
+-- | Generate a binary operator
+genBop :: Map LType [Name] -> Int -> LType -> Gen Expression
+genBop m n IntType = Op2 <$>
+  genExp m n IntType <*>
+  QC.oneof [pure Plus, pure Minus, pure Times, pure Divide, pure Modulo]
+  <*> genExp m n IntType
+genBop m n StringType = Op2 <$>
+  genExp m n StringType <*>
+  pure Concat <*>
+  genExp m n StringType
+genBop m n BooleanType = Op2 <$>
+  genExp m n BooleanType <*>
+  QC.oneof [pure Eq, pure Gt, pure Ge, pure Lt, pure Le] <*>
+  genExp m n BooleanType
+genBop m n t = genExpVar m n t -- try to generate a var
 
 -- | Generate a list of fields in a table constructor epression.
 -- We limit the size of the table to avoid size blow up.
-genTableFields :: Int -> Gen [TableField]
-genTableFields n = do
-  len <- QC.elements [0 .. 3]
-  take len <$> QC.infiniteListOf (genTableField n)
+genTableFields :: Map LType [Name] -> Int -> LType -> Gen Expression
+genTableFields m n t@(TableType t1 t2) = do
+    len <- QC.elements [1 .. 3]
+    TableConst . take len <$> QC.infiniteListOf (genTableField m n t)
+genTableFields m n t = genExpVar m n t -- try to generate a var
 
-genTableField :: Int -> Gen TableField
-genTableField n =
+genTableField :: Map LType [Name] -> Int -> LType -> Gen TableField
+genTableField m n (TableType t1 t2) =
   QC.oneof
-    [ FieldName <$> genName <*> genExp n',
-      FieldKey <$> genExp n' <*> genExp n'
+    [ genFieldName,
+      FieldKey <$> genExp m n' t1 <*> genExp m n' t2
     ]
   where
     n' = n `div` 2
+    (l1, _) = generateValidNames m t1
+    genFieldName = if t1 == StringType && not (null l1)
+      then FieldName <$> genName l1 <*> genExp m n' t2
+      else FieldKey <$> genExp m n' t1 <*> genExp m n' t2
+genTableField _ _ _ = undefined -- will never reach here
 
 -- | Generate a size-controlled statement
-genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = QC.oneof [Assign <$> genTypedVar 0 <*> genExp 0, return Empty]
-genStatement n =
+genStatement :: Map LType [Name] -> Int -> Gen Statement
+genStatement m n | n <= 1 = QC.oneof [genType True >>= genAssign m 0, return Empty]
+genStatement m n =
   QC.frequency
-    [ (1, Assign <$> genTypedVar n' <*> genExp n'),
+    [ (1, genType True >>= genAssign m n'),
       (1, return Empty),
-      (n, If <$> genExp n' <*> genBlock n' <*> genBlock n'),
-      -- generate loops half as frequently as if statements
-      (n', While <$> genExp n' <*> genBlock n'),
-      (n', Repeat <$> genBlock n' <*> genExp n')
+      (n, do
+        e <- genExp m n' BooleanType
+        b1 <- genBlock m n'
+        let updatedMap = updateMapFromIf m b1
+        b2 <- genBlock updatedMap n'
+        return (If e b1 b2)
+      )
+      -- -- generate loops half as frequently as if statements
+      -- (n', do
+      --   let (l1, _) = generateValidNames m BooleanType
+      --   if null l1
+      --     then return Empty
+      --     else While <$> genExpVar m n' BooleanType <*> genBlock m n'
+      -- ),
+      -- (n', do
+      --   let (l1, _) = generateValidNames m BooleanType
+      --   if null l1
+      --     then return Empty
+      --     else Repeat <$> genBlock m n' <*> genExpVar m n' BooleanType
+      -- )
     ]
   where
     n' = n `div` 2
 
-genBlock :: Int -> Gen Block
-genBlock n = Block <$> genStmts n
+-- | Generate a size-controlled assign statement
+genAssign :: Map LType [Name] -> Int -> LType -> Gen Statement
+genAssign m n t = case generateValidNames m t of
+  ([], []) -> return Empty
+  (l1, l2) -> Assign <$> genTypedVar (l1 ++ l2) m n t <*> genExp m n t
+
+-- | Generate a size-controlled block
+genBlock :: Map LType [Name] -> Int -> Gen Block
+genBlock m n = Block <$> genStmts m n
   where
-    genStmts 0 = pure []
-    genStmts n =
+    genStmts :: Map LType [Name] -> Int -> Gen [Statement]
+    genStmts _ 0 = pure []
+    genStmts m n =
       QC.frequency
         [ (1, return []),
-          (n, (:) <$> genStatement n' <*> genStmts n')
+          (n, do
+            stmt <- genStatement m n'
+            let updatedMap = updateMapFromStatement m stmt
+            rest <- genStmts updatedMap n'
+            return (stmt : rest)
+          )
         ]
       where
         n' = n `div` 2
 
+-- | Update the map of valid names based on the given statement
+updateMapFromStatement :: Map LType [Name] -> Statement -> Map LType [Name]
+updateMapFromStatement m (Assign (var, varType) _) =
+  case var of
+    Name name ->
+      case Map.lookup varType m of
+        Just typeList -> -- Not the first variable of this type
+          case Map.lookup NilType m of
+            Just nilList ->
+              let updatedNilList = filter (/= name) nilList
+                  updatedTypeList = name : typeList
+              in Map.insert varType updatedTypeList (Map.insert NilType updatedNilList m)
+            Nothing -> m  -- NilType not a key
+        Nothing -> -- First variable of this type
+          case Map.lookup NilType m of
+            Just nilList ->
+              let updatedNilList = filter (/= name) nilList
+              in Map.insert varType [name] (Map.insert NilType updatedNilList m)
+            Nothing ->
+              Map.insert varType [name] m -- NilType not a key
+    _ -> m  -- Nothing to update
+updateMapFromStatement m (If _ b1 b2) = updateMapFromIf (updateMapFromIf m b1) b2
+  -- in updateMapFromBlock updatedMap b2
+updateMapFromStatement m (While _ b) = updateMapFromBlock m b
+updateMapFromStatement m (Repeat b _) = updateMapFromBlock m b
+updateMapFromStatement m _ = m
+
+-- | Update the map of valid names based on the given block
+updateMapFromBlock :: Map LType [Name] -> Block -> Map LType [Name]
+updateMapFromBlock m (Block []) = m
+updateMapFromBlock m (Block (s : ss)) =
+  let updatedMap = updateMapFromStatement m s
+  in updateMapFromBlock updatedMap (Block ss)
+
+-- | Update map of valid names after an if statement block
+updateMapFromIf :: Map LType [Name] -> Block -> Map LType [Name]
+updateMapFromIf m b =
+  case Map.lookup NilType (updateMapFromBlock m b) of
+    Just l -> Map.insert NilType l m
+    Nothing -> m
+
+-- | Generate a size-controlled type
+genType :: Bool -> Gen LType
+genType False = QC.oneof [return IntType, return StringType, return BooleanType]
+genType True =
+  QC.oneof
+    [ return IntType,
+      return StringType,
+      return BooleanType,
+      TableType <$> genParameterType <*> genType False
+      -- FunctionType <$> genParameterType <*> genType False
+    ]
+
+-- | Generate a parameter type
+genParameterType :: Gen LType
+genParameterType =
+  QC.oneof
+    [ return IntType,
+      return StringType,
+      return BooleanType,
+      UnionType <$> genType False <*> genType False
+    ]
+
 instance Arbitrary Var where
-  arbitrary = QC.sized genVar
+  arbitrary = QC.sized $ \size -> do
+      ltype <- genType False
+      genVar (concat (generateValidNames m ltype)) m size ltype where
+    m = Map.singleton NilType (map (:[]) ['a'..'z'])
+
   shrink (Name n) = []
   shrink (Dot e n) = [Dot e' n | e' <- shrink e]
   shrink (Proj e1 e2) =
@@ -447,7 +608,8 @@ instance Arbitrary Var where
       ++ [Proj e1 e2' | e2' <- shrink e2]
 
 instance Arbitrary Statement where
-  arbitrary = QC.sized genStatement
+  arbitrary = QC.sized (genStatement m) where
+    m = Map.singleton NilType (map (:[]) ['a'..'z'])
   shrink (Assign v e) =
     [Assign v' e | v' <- shrink v]
       ++ [Assign v e' | e' <- shrink e]
@@ -478,18 +640,26 @@ getExp (FieldName _ e) = [e]
 getExp (FieldKey e1 e2) = [e1, e2]
 
 instance Arbitrary TableField where
-  arbitrary = QC.sized genTableField
+  arbitrary = QC.sized $ \size -> do
+      ltype <- genType False
+      genTableField m size ltype where
+    m = Map.singleton NilType (map (:[]) ['a'..'z'])
   shrink (FieldName n e1) = [FieldName n e1' | e1' <- shrink e1]
   shrink (FieldKey e1 e2) =
     [FieldKey e1' e2 | e1' <- shrink e1]
       ++ [FieldKey e1 e2' | e2' <- shrink e2]
 
 instance Arbitrary Block where
-  arbitrary = QC.sized genBlock
-  shrink (Block ss) = [Block ss' | ss' <- shrink ss]
+  arbitrary = QC.sized (genBlock m) where
+    m = Map.singleton NilType (map (:[]) ['a'..'z'])
+
+  shrink (Block ss) = []
 
 instance Arbitrary Expression where
-  arbitrary = QC.sized genExp
+  arbitrary = QC.sized $ \size -> do
+      ltype <- genType False
+      genExp m size ltype where
+    m = Map.singleton NilType (map (:[]) ['a'..'z'])
 
   shrink (Val v) = Val <$> shrink v
   shrink (Var v) = Var <$> shrink v
