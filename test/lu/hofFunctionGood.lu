@@ -1,0 +1,22 @@
+applyBoth = function (f1 : int -> boolean, f2 : boolean -> int, x : int) : int 
+    return f2(f1(x))
+end 
+
+function toBool(x : int) : boolean 
+    if x == 0 then 
+        return false 
+    else 
+        return true 
+    end 
+end  
+
+function toInt(b : boolean) : int 
+    if b then 
+        return 1 
+    else 
+        return 0 
+    end 
+end  
+
+
+z = applyBoth(toBool, toInt, 10)

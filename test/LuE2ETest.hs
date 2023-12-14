@@ -117,7 +117,8 @@ test_function =
         "unionTypeFunc" ~: testFile "test/lu/unionTypeFunc.lu" (checkVarExistsInStore "foo"),
         "function7" ~: testFile "test/lu/function7.lu" (checkVarValuesInStore [("b", IntVal 10), ("z", IntVal 8)]),
         "nameShadow" ~: testFile "test/lu/nameShadow.lu" (checkVarValuesInStore [("res", IntVal 10), ("s", StringVal "s")]),
-        "mutualRecFunction" ~: testFile "test/lu/mutualRecFunc.lu" (checkVarValuesInStore [("result", BoolVal True), ("result2", BoolVal True)])
+        "mutualRecFunction" ~: testFile "test/lu/mutualRecFunc.lu" (checkVarValuesInStore [("result", BoolVal True), ("result2", BoolVal True)]),
+        "hofFunctionGood" ~: testFile "test/lu/hofFunctionGood.lu" (checkVarValuesInStore [("z", IntVal 1)])
         -- "functionFromTable" ~: testFile "test/lu/functionFromTable.lu" (checkVarValuesInStore [("result", IntVal 6)])
       ]
 
@@ -170,7 +171,8 @@ test_typeCheck =
         "tables1" ~: testTypeCheckFile "test/lu/tables1.lu" True,
         "typedBFS" ~: testTypeCheckFile "test/lu/typedBFS.lu" True,
         "typedTable" ~: testTypeCheckFile "test/lu/typedTable.lu" True,
-        "redefineOk" ~: testTypeCheckFile "test/lu/redefineOk.lu" True
+        "redefineOk" ~: testTypeCheckFile "test/lu/redefineOk.lu" True,
+        "hofFunctionGood" ~: testTypeCheckFile "test/lu/hofFunctionGood.lu" True
       ]
 
 test_typeCheckStore :: Test
